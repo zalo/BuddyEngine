@@ -143,10 +143,22 @@ const clampY = (y) => Math.max(YB + 150, Math.min(YT - 150, y));
 // ---------------------------------------------------------------------------
 const surfObjs = new Map(); // collider id -> {objId, cx, cz, hx, hz}
 
+// The host's depth slabs (sys/wall_back/front) pin bodies to the desktop
+// plane along Y — but the collider feed is 2D (cx/cz/hx/hz only), so they
+// arrive as boxes covering the whole screen. They must never become SM64
+// geometry (the static corridor already handles depth) or Mario ends up
+// "inside" them and gets ejected to a screen edge. Same for anything else
+// screen-sized in both axes.
+function isSolidForMario(c) {
+    if (c.id === 'sys/wall_back' || c.id === 'sys/wall_front') return false;
+    if (c.hx > halfWm + 3 && c.hz > buddy.screen.hPx / buddy.screen.ppm) return false;
+    return true;
+}
+
 function syncColliders(colliders) {
     const seen = new Set();
     for (const c of colliders) {
-        if (c.hx <= 0 || c.hz <= 0) continue;
+        if (c.hx <= 0 || c.hz <= 0 || !isSolidForMario(c)) continue;
         seen.add(c.id);
         const prev = surfObjs.get(c.id);
         if (prev && prev.hx === c.hx && prev.hz === c.hz) {
@@ -748,6 +760,7 @@ buddy.onFrame((world) => {
         // teleported up through him): pop out — top if close, else nearest
         // side (skip while held: the grab teleport would fight it)
         for (const c of mario.holding ? [] : world.colliders) {
+            if (!isSolidForMario(c)) continue;
             const fx = mario.pos[0] / U, fz = mario.pos[1] / U;
             const mid = fz + 0.3; // mid-body: feet can rest exactly on a box boundary
             const inX = fx > c.cx - c.hx + 0.02 && fx < c.cx + c.hx - 0.02;

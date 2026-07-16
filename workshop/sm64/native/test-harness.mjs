@@ -65,11 +65,18 @@ let T = 0;
 const DT = 1 / 60;
 const cursor = { px: 0, py: 0, wx: -4, wz: 3, l: 0, r: 0 };
 let events = [];
-const GROUND = { id: 'sys/ground', cx: 0, cz: -0.5, hx: 10, hz: 0.5, kinematic: false };
-const WALL_L = { id: 'sys/wall_l', cx: -8.2, cz: 4, hx: 0.2, hz: 8, kinematic: false };
-const WALL_R = { id: 'sys/wall_r', cx: 8.2, cz: 4, hx: 0.2, hz: 8, kinematic: false };
-const WIN = { id: 'sys/win:42', cx: 5.5, cz: 0.5, hx: 1.5, hz: 0.5, kinematic: true };
-let colliders = [GROUND, WALL_L, WALL_R, WIN];
+// Collider shapes mirror desk.js exactly: ground/walls are static and huge,
+// windows are thin platform strips (hz=0.12) along their top edge, and the
+// depth slabs (wall_back/front) arrive as screen-covering 2D boxes — the
+// pack must ignore those or Mario gets "depenetrated" to a screen edge.
+const GROUND = { id: 'sys/ground', cx: 0, cz: -5, hx: 56, hz: 5, kinematic: false };
+const WALL_L = { id: 'sys/wall_l', cx: -10, cz: 25, hx: 2, hz: 30, kinematic: false };
+const WALL_R = { id: 'sys/wall_r', cx: 10, cz: 25, hx: 2, hz: 30, kinematic: false };
+const SLAB_B = { id: 'sys/wall_back', cx: 0, cz: 25, hx: 56, hz: 35, kinematic: false };
+const SLAB_F = { id: 'sys/wall_front', cx: 0, cz: 25, hx: 56, hz: 35, kinematic: false };
+const WIN = { id: 'sys/win:42:0', cx: 5.5, cz: 0.88, hx: 1.5, hz: 0.12, kinematic: true };
+const BASE = [GROUND, WALL_L, WALL_R, SLAB_B, SLAB_F];
+let colliders = [...BASE, WIN];
 
 function frame() {
     T += DT;
@@ -107,6 +114,11 @@ console.log('pack loaded');
 await run(1);
 check('boots and spawns mario', logs.some(l => l.includes('mario spawned')));
 
+// 0. regression: screen-covering depth slabs must not eject him sideways
+await run(5);
+check('not ejected by depth slabs (x=' + proxyPos()[0].toFixed(2) + ')',
+    Math.abs(proxyPos()[0]) < 6);
+
 // 1. wanders on its own (random idle pauses: poll until he strolls, 60s cap)
 const x0 = proxyPos()[0];
 let moved = 0;
@@ -117,21 +129,21 @@ check('stays on ground plane (z=' + proxyPos()[2].toFixed(2) + ')', Math.abs(pro
 // 2. moving platform: raise the ground under him — a surface object move
 // (window removed so he can't coincidentally be standing on it; wait until
 // he's settled on the ground so platform displacement applies)
-colliders = [GROUND, WALL_L, WALL_R];
+colliders = [...BASE];
 for (let i = 0; i < 40; i++) {
     await run(0.25);
     const m = globalThis.__mario;
     if (m.grounded && Math.abs(m.pos[1]) < 30 && (m.state === 'idle' || m.state === 'wander')) break;
 }
-GROUND.cz = 0.5; // top now at 1.0m
-colliders = [GROUND, WALL_L, WALL_R];
+GROUND.cz = -4; // top now at 1.0m
+colliders = [...BASE];
 await run(3);
 check('rides a moving collider up (z=' + proxyPos()[2].toFixed(2) + ')', proxyPos()[2] > 1.0);
-GROUND.cz = -0.5;
-colliders = [GROUND, WALL_L, WALL_R];
+GROUND.cz = -5;
+colliders = [...BASE];
 await run(3);
 check('falls back down (z=' + proxyPos()[2].toFixed(2) + ')', proxyPos()[2] < 0.8);
-colliders = [GROUND, WALL_L, WALL_R, WIN];
+colliders = [...BASE, WIN];
 
 // 3. high-speed body -> damage
 broadcasts.length = 0;
