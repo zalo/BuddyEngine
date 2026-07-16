@@ -1,3 +1,5 @@
+//go:build windows
+
 package win32
 
 import (
@@ -37,12 +39,12 @@ type monitorInfo struct {
 }
 
 var ignoredClasses = map[string]bool{
-	"Progman":                 true,
-	"WorkerW":                 true,
-	"Shell_TrayWnd":           true,
-	"Shell_SecondaryTrayWnd":  true,
-	"NotifyIconOverflowWindow": true,
-	"Windows.UI.Core.CoreWindow": true,
+	"Progman":                      true,
+	"WorkerW":                      true,
+	"Shell_TrayWnd":                true,
+	"Shell_SecondaryTrayWnd":       true,
+	"NotifyIconOverflowWindow":     true,
+	"Windows.UI.Core.CoreWindow":   true,
 	"XamlExplorerHostIslandWindow": true,
 }
 

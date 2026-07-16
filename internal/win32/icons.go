@@ -1,3 +1,5 @@
+//go:build windows
+
 package win32
 
 import (
@@ -7,11 +9,11 @@ import (
 )
 
 const (
-	lvmFirst           = 0x1000
-	lvmGetItemCount    = lvmFirst + 4
-	lvmGetItemRect     = lvmFirst + 14
-	lvirBounds         = 0
-	lvirIcon           = 1
+	lvmFirst        = 0x1000
+	lvmGetItemCount = lvmFirst + 4
+	lvmGetItemRect  = lvmFirst + 14
+	lvirBounds      = 0
+	lvirIcon        = 1
 
 	processVMOperation = 0x0008
 	processVMRead      = 0x0010
@@ -25,9 +27,9 @@ const (
 )
 
 var (
-	procVirtualAllocEx    = kernel32.NewProc("VirtualAllocEx")
-	procVirtualFreeEx     = kernel32.NewProc("VirtualFreeEx")
-	procReadProcessMemory = kernel32.NewProc("ReadProcessMemory")
+	procVirtualAllocEx     = kernel32.NewProc("VirtualAllocEx")
+	procVirtualFreeEx      = kernel32.NewProc("VirtualFreeEx")
+	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
 	procWriteProcessMemory = kernel32.NewProc("WriteProcessMemory")
 )
 

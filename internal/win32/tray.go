@@ -1,3 +1,5 @@
+//go:build windows
+
 package win32
 
 import (
@@ -33,25 +35,25 @@ const (
 )
 
 var (
-	shell32                = windows.NewLazySystemDLL("shell32.dll")
-	procShellNotifyIconW   = shell32.NewProc("Shell_NotifyIconW")
-	procExtractIconW       = shell32.NewProc("ExtractIconW")
-	procRegisterClassExW   = user32.NewProc("RegisterClassExW")
-	procCreateWindowExW    = user32.NewProc("CreateWindowExW")
-	procDefWindowProcW     = user32.NewProc("DefWindowProcW")
-	procGetMessageW        = user32.NewProc("GetMessageW")
-	procTranslateMessage   = user32.NewProc("TranslateMessage")
-	procDispatchMessageW   = user32.NewProc("DispatchMessageW")
-	procCreatePopupMenu    = user32.NewProc("CreatePopupMenu")
-	procDestroyMenu        = user32.NewProc("DestroyMenu")
-	procAppendMenuW        = user32.NewProc("AppendMenuW")
-	procTrackPopupMenu     = user32.NewProc("TrackPopupMenu")
-	procSetForegroundWnd   = user32.NewProc("SetForegroundWindow")
-	procLoadIconW          = user32.NewProc("LoadIconW")
-	procPostMessageW       = user32.NewProc("PostMessageW")
-	procPostQuitMessage    = user32.NewProc("PostQuitMessage")
-	procShowWindow         = user32.NewProc("ShowWindow")
-	procGetModuleHandleW   = kernel32.NewProc("GetModuleHandleW")
+	shell32              = windows.NewLazySystemDLL("shell32.dll")
+	procShellNotifyIconW = shell32.NewProc("Shell_NotifyIconW")
+	procExtractIconW     = shell32.NewProc("ExtractIconW")
+	procRegisterClassExW = user32.NewProc("RegisterClassExW")
+	procCreateWindowExW  = user32.NewProc("CreateWindowExW")
+	procDefWindowProcW   = user32.NewProc("DefWindowProcW")
+	procGetMessageW      = user32.NewProc("GetMessageW")
+	procTranslateMessage = user32.NewProc("TranslateMessage")
+	procDispatchMessageW = user32.NewProc("DispatchMessageW")
+	procCreatePopupMenu  = user32.NewProc("CreatePopupMenu")
+	procDestroyMenu      = user32.NewProc("DestroyMenu")
+	procAppendMenuW      = user32.NewProc("AppendMenuW")
+	procTrackPopupMenu   = user32.NewProc("TrackPopupMenu")
+	procSetForegroundWnd = user32.NewProc("SetForegroundWindow")
+	procLoadIconW        = user32.NewProc("LoadIconW")
+	procPostMessageW     = user32.NewProc("PostMessageW")
+	procPostQuitMessage  = user32.NewProc("PostQuitMessage")
+	procShowWindow       = user32.NewProc("ShowWindow")
+	procGetModuleHandleW = kernel32.NewProc("GetModuleHandleW")
 )
 
 type wndClassEx struct {

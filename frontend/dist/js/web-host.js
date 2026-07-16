@@ -12,6 +12,14 @@ const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
 const TASKBAR_CSS = IS_MOBILE ? 44 : 36;
 const PPM = (IS_MOBILE ? 90 : 140) * DPR;
 
+// Real Wails bindings present? Then this is the native Linux build (its
+// asset server serves web.html as the index): keep DOM input and the XP
+// chrome, but load packs from the workshop folder on disk and feed the Go
+// watchdog. Wails injects its runtime via classic scripts, so bindings
+// exist before this module runs.
+const native = (window.go && window.go.main && window.go.main.App &&
+    window.runtime && window.runtime.EventsOn) ? window.go.main.App : null;
+
 // Excluded by default (still available via ?packs=): sm64 needs a
 // user-supplied ROM that never ships; stickman is a bit of a menace.
 const WEB_EXCLUDED = new Set(['sm64', 'stickman']);
@@ -48,7 +56,9 @@ function emit(name, payload) {
 // ---------------------------------------------------------------------------
 // window.go.main.App — backend API
 // ---------------------------------------------------------------------------
-const packs = (await packList()).map(id => ({ id, name: id, source: 'web' }));
+const packs = native
+    ? (await native.GetBootstrap()).packs
+    : (await packList()).map(id => ({ id, name: id, source: 'web' }));
 
 function bufToB64(buf) {
     const bytes = new Uint8Array(buf);
@@ -60,7 +70,7 @@ function bufToB64(buf) {
     return btoa(s);
 }
 
-window.go = { main: { App: {
+const App = {
     async GetBootstrap() {
         return {
             screenW: Math.round(innerWidth * DPR),
@@ -72,23 +82,29 @@ window.go = { main: { App: {
         };
     },
     async ReadPackFile(packId, rel) {
+        if (native) return native.ReadPackFile(packId, rel);
         const r = await fetch(`./packs/${packId}/${rel}`);
         if (!r.ok) throw new Error(`pack file missing: ${packId}/${rel}`);
         return bufToB64(await r.arrayBuffer());
     },
+    async RefreshPacks() { return native ? native.RefreshPacks() : packs; },
+    SetClickThrough() {},
+    Heartbeat() { if (native) native.Heartbeat(); },
+    LogError(msg) { if (native) native.LogError(msg); },
+    Quit() { native ? native.Quit() : location.reload(); },
+};
+if (!native) {
     // Binary fast path (cartridges prefers it): no base64 round-trip, no
-    // main-thread stalls on multi-MB pack assets.
-    async ReadPackBytes(packId, rel) {
+    // main-thread stalls on multi-MB pack assets. The Go binding returns
+    // base64, so natively cartridges falls back to ReadPackFile + its
+    // native data-URI decode.
+    App.ReadPackBytes = async (packId, rel) => {
         const r = await fetch(`./packs/${packId}/${rel}`);
         if (!r.ok) throw new Error(`pack file missing: ${packId}/${rel}`);
         return r.arrayBuffer();
-    },
-    async RefreshPacks() { return packs; },
-    SetClickThrough() {},
-    Heartbeat() {},
-    LogError() {}, // host already mirrors everything to console.log
-    Quit() { location.reload(); },
-} } };
+    };
+}
+window.go = { main: { App } };
 
 // ---------------------------------------------------------------------------
 // Cursor stream from DOM pointer events (mouse + touch)
