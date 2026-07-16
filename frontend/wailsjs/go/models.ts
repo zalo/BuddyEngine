@@ -46,7 +46,6 @@ export namespace workshop {
 	export class PackInfo {
 	    id: string;
 	    source: string;
-	    manifest: number[];
 	    name: string;
 	
 	    static createFrom(source: any = {}) {
@@ -57,7 +56,6 @@ export namespace workshop {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.source = source["source"];
-	        this.manifest = source["manifest"];
 	        this.name = source["name"];
 	    }
 	}

@@ -70,21 +70,11 @@ async function boot() {
     });
     interact.cartMgr = cartMgr;
 
+    // Every discovered pack is a folder with a main.js — spawn them all.
     const packs = bootstrap.packs || [];
-    let spawned = 0;
-    for (const p of packs) {
-        try {
-            const m = typeof p.manifest === 'string' ? JSON.parse(p.manifest) : p.manifest;
-            if (m && m.main) {
-                cartMgr.spawn(p, m);
-                spawned++;
-            }
-        } catch (e) {
-            console.warn('pack manifest error:', p.name, e);
-        }
-    }
-    if (spawned === 0) {
-        logToBackend('no runnable packs found — drop packs into the workshop folder');
+    for (const p of packs) cartMgr.spawn(p);
+    if (packs.length === 0) {
+        logToBackend('no packs found — drop pack folders (containing main.js) into the workshop folder');
     }
 
     // Backend event streams.
@@ -100,7 +90,7 @@ async function boot() {
     running = true;
     lastSimTimestamp = performance.now();
     requestAnimationFrame(mainLoop);
-    console.log('BuddyEngine host running,', spawned, 'buddy cell(s) spawning');
+    console.log('BuddyEngine host running,', packs.length, 'buddy cell(s) spawning');
 }
 
 function mainLoop(timestamp) {

@@ -1,7 +1,0 @@
-{
-  "name": "Wisp",
-  "author": "BuddyEngine",
-  "version": 1,
-  "main": "main.js",
-  "description": "A skittish glowing orb that shares the desktop with your buddy and flees the cursor."
-}

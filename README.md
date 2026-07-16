@@ -59,19 +59,25 @@ with vendored three.js, onnxruntime-web and physx-js-webidl.
 
 ## Workshop packs
 
-A pack is a folder with a `manifest.json`:
+A pack is any folder containing a `main.js` — nothing else is required. The
+folder name is the pack's ID and default display name; richer metadata is
+exported from the script itself:
 
-```json
-{
-  "name": "My Buddy",
-  "author": "you",
-  "version": 1,
-  "llc": "my_llc.onnx",          // required: MimicKit LLC with baked mjcf/config
-  "hlc_strike": "my_hlc.onnx",   // optional: strike-task HLC
-  "pixelsPerMeter": 140,          // optional: on-screen scale
-  "tools": [{ "name": "Sword", "body": "sword" }]
-}
+```js
+export const meta = {
+  name: 'My Buddy',
+  author: 'you',
+  version: '1',
+  description: 'What it does',
+};
+
+const buddy = await Buddy.ready();
+// ...spawn bodies/rigs, build visuals, drive behavior (see BUDDY_API.md)
 ```
+
+Pack code runs in a sandboxed null-origin iframe, never on the host; see
+`BUDDY_API.md` for the full API and `workshop/swordfighter` /
+`workshop/wisp` for reference packs.
 
 Sources scanned at startup (and from the right-click menu):
 
@@ -79,11 +85,12 @@ Sources scanned at startup (and from the right-click menu):
 2. Steam Workshop subscribed items — automatic when `steam_api64.dll` sits
    next to the exe and Steam is running (`steam_appid.txt` with your AppID;
    480/Spacewar works for testing). Items whose install folder contains a
-   `manifest.json` are loaded like local packs.
+   `main.js` are loaded like local packs.
 
-The LLC/HLC models come from the MimicKit pipeline (same format as the
-SwordBrawl web demo — the LLC carries a `mimickit_config` JSON blob with the
-MJCF, normalization stats, init pose and action bounds in its ONNX metadata).
+The swordfighter's LLC/HLC models come from the MimicKit pipeline (same
+format as the SwordBrawl web demo — the LLC carries a `mimickit_config`
+JSON blob with the MJCF, normalization stats, init pose and action bounds
+in its ONNX metadata).
 
 ## Notes / current limitations
 

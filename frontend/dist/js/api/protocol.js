@@ -91,6 +91,7 @@ export const OPS = {
     BUS_SEND: 'bus.send',           // {to:'b<N>'|'*', topic, data} — data is structured-clone JSON
     READY: 'ready',                 // {} — first command a cell must send
     LOG: 'log',                     // {msg}
+    META: 'meta',                   // {name?, description?, author?, version?} — relayed from the pack's `export const meta`
 };
 
 // Host -> cell message types (besides 'frame'): 'boot', 'init', 'asset',

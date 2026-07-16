@@ -7,6 +7,16 @@
 // actions computed from this frame's observations are applied before the
 // host's next physics step.
 
+export const meta = {
+    name: 'Swordfighter',
+    author: 'BuddyEngine',
+    version: '2',
+    description: 'MimicKit sword & shield humanoid: chases and strikes the mouse cursor, does idle skills when you leave it alone.',
+};
+
+const LLC_FILE = 'llc_sword_shield.onnx';
+const HLC_FILE = 'hlc_strike.onnx';
+
 const buddy = await Buddy.ready();
 const mk = await buddy.assets.module('mimickit.js');
 const M = mk; // quat math lives alongside the parser
@@ -25,12 +35,12 @@ ort.env.wasm.wasmPaths = {
 };
 ort.env.wasm.numThreads = 1;
 
-const llcBuf = await buddy.assets.bytes(buddy.manifest.llc);
+const llcBuf = await buddy.assets.bytes(LLC_FILE);
 const llc = await ort.InferenceSession.create(llcBuf, { executionProviders: ['wasm'] });
 let hlc = null;
 try {
     hlc = await ort.InferenceSession.create(
-        await buddy.assets.bytes(buddy.manifest.hlc_strike), { executionProviders: ['wasm'] });
+        await buddy.assets.bytes(HLC_FILE), { executionProviders: ['wasm'] });
 } catch (e) {
     buddy.log('no HLC, running latent-only:', e.message);
 }

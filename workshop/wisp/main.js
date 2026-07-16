@@ -2,6 +2,13 @@
 // that shares the PhysX world with the sword buddy: it flees the cursor,
 // startles when the avatar gets close, and can be grabbed and thrown.
 
+export const meta = {
+    name: 'Wisp',
+    author: 'BuddyEngine',
+    version: '1',
+    description: 'A skittish glowing orb that shares the desktop with your buddies and flees the cursor.',
+};
+
 const buddy = await Buddy.ready();
 buddy.log('wisp online, instance', buddy.id);
 

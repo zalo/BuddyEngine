@@ -1,16 +1,9 @@
 // Package workshop loads buddy/tool content packs.
 //
-// A pack is a folder containing a manifest.json:
-//
-//	{
-//	  "name": "Sword & Shield Buddy",
-//	  "author": "you",
-//	  "version": 1,
-//	  "llc": "llc_sword_shield.onnx",       // low-level controller (required)
-//	  "hlc_strike": "hlc_strike.onnx",      // strike task controller (optional)
-//	  "pixelsPerMeter": 140,                // display scale (optional)
-//	  "tools": [{ "name": "Sword", "body": "sword" }]
-//	}
+// A pack is simply a folder containing a main.js — no manifest. The folder
+// name is the pack's ID and default display name; richer metadata (display
+// name, description, author) is exported from main.js as `export const
+// meta = {...}` and reported back by the running cell.
 //
 // Packs come from two providers: a local "workshop" folder next to the
 // executable (for development and non-Steam sharing) and Steam Workshop
@@ -19,7 +12,6 @@ package workshop
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -27,13 +19,12 @@ import (
 	"sync"
 )
 
-// PackInfo is the manifest plus provenance, sent to the frontend.
+// PackInfo is a discovered pack, sent to the frontend.
 type PackInfo struct {
-	ID       string          `json:"id"`
-	Source   string          `json:"source"` // "builtin" | "local" | "steam"
-	Path     string          `json:"-"`
-	Manifest json.RawMessage `json:"manifest"`
-	Name     string          `json:"name"`
+	ID     string `json:"id"`
+	Source string `json:"source"` // "local" | "steam"
+	Path   string `json:"-"`
+	Name   string `json:"name"` // folder name; cells may override via meta
 }
 
 type Manager struct {
@@ -98,24 +89,17 @@ func (m *Manager) scanDir(dir, source string) {
 	m.loadPack(dir, source)
 }
 
+// A folder is a pack iff it contains main.js.
 func (m *Manager) loadPack(dir, source string) {
-	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
-	if err != nil {
-		return
-	}
-	var meta struct {
-		Name string `json:"name"`
-	}
-	if json.Unmarshal(raw, &meta) != nil || meta.Name == "" {
+	if _, err := os.Stat(filepath.Join(dir, "main.js")); err != nil {
 		return
 	}
 	id := source + ":" + filepath.Base(dir)
 	m.packs[id] = &PackInfo{
-		ID:       id,
-		Source:   source,
-		Path:     dir,
-		Manifest: raw,
-		Name:     meta.Name,
+		ID:     id,
+		Source: source,
+		Path:   dir,
+		Name:   filepath.Base(dir),
 	}
 }
 

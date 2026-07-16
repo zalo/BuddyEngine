@@ -1,4 +1,4 @@
-// Buddy cell runtime: each buddy pack with a `main` script runs in a
+﻿// Buddy cell runtime: each buddy pack with a `main` script runs in a
 // sandboxed null-origin iframe. The host pumps packcat-packed world frames
 // in; cells reply with validated command batches. No pack code ever runs in
 // this context.
@@ -23,7 +23,17 @@ const HARNESS = `<!doctype html><html><head>
       proto.initProtocol(packcat);
       const sdk = await import(mk(e.data.sdk));
       sdk.__init(proto, e.data.init);
-      await import(mk(e.data.main));
+      // Pack code executes HERE, in the cell - never on the host. Its
+      // optional 'export const meta = {...}' is relayed as plain strings.
+      const mod = await import(mk(e.data.main));
+      if (mod && mod.meta) {
+        const m = mod.meta;
+        parent.postMessage({ t: 'commands', cmds: [{
+          op: 'meta',
+          name: m.name, description: m.description,
+          author: m.author, version: m.version,
+        }] }, '*');
+      }
     } catch (err) {
       parent.postMessage({ t: 'commands', cmds: [{ op: 'log', msg: 'cell boot error: ' + (err.stack || err) }] }, '*');
     }
@@ -34,10 +44,11 @@ const HARNESS = `<!doctype html><html><head>
 let cellCounter = 0;
 
 class Cell {
-    constructor(mgr, pack, manifest) {
+    constructor(mgr, pack) {
         this.mgr = mgr;
         this.pack = pack;
-        this.manifest = manifest;
+        this.name = pack.name;   // folder name until the cell's meta arrives
+        this.meta = {};
         this.id = 'b' + (++cellCounter);
         this.ready = false;
         this.dead = false;
@@ -64,7 +75,7 @@ class Cell {
         document.body.appendChild(iframe);
         await new Promise(res => iframe.addEventListener('load', res, { once: true }));
 
-        const mainSrc = await this.mgr.readPackText(this.pack, this.manifest.main);
+        const mainSrc = await this.mgr.readPackText(this.pack, 'main.js');
         iframe.contentWindow.postMessage({
             t: 'boot',
             packcat: this.mgr.sources.packcat,
@@ -74,7 +85,7 @@ class Cell {
             init: {
                 v: 1,
                 instanceId: this.id,
-                manifest: this.manifest,
+                packName: this.pack.name,
                 screen: this.mgr.screenInfo(),
             },
         }, '*');
@@ -83,7 +94,7 @@ class Cell {
     kill(reason) {
         if (this.dead) return;
         this.dead = true;
-        this.mgr.log(`cell ${this.id} (${this.manifest.name}) killed: ${reason}`);
+        this.mgr.log(`cell ${this.id} (${this.name}) killed: ${reason}`);
         for (const local of this.bodyIds) this.mgr.sim.removeBody(this.fq(local));
         this.bodyIds.clear();
         for (const local of this.artiIds) this.mgr.sim.removeArticulation(this.fq(local));
@@ -127,9 +138,9 @@ export class CartridgeManager {
         };
     }
 
-    async spawn(pack, manifest) {
+    async spawn(pack) {
         if (!this.sources) await this.loadSources();
-        const cell = new Cell(this, pack, manifest);
+        const cell = new Cell(this, pack);
         this.cells.set(cell.id, cell);
         try {
             await cell.start();
@@ -189,7 +200,18 @@ export class CartridgeManager {
                 cell.ready = true;
                 break;
             case OPS.LOG:
-                this.log(`[${cell.id} ${cell.manifest.name}] ${String(c.msg).slice(0, 500)}`);
+                this.log(`[${cell.id} ${cell.name}] ${String(c.msg).slice(0, 500)}`);
+                break;
+            case OPS.META:
+                // Pack self-description, exported from its main.js and read
+                // inside the cell — the host only receives these strings.
+                cell.meta = {
+                    name: c.name !== undefined ? String(c.name).slice(0, 64) : undefined,
+                    description: c.description !== undefined ? String(c.description).slice(0, 500) : undefined,
+                    author: c.author !== undefined ? String(c.author).slice(0, 64) : undefined,
+                    version: c.version !== undefined ? String(c.version).slice(0, 16) : undefined,
+                };
+                if (cell.meta.name) cell.name = cell.meta.name;
                 break;
 
             // -- physics (queued; applied just before the next sim step) ----

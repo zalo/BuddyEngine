@@ -189,11 +189,13 @@ emergent interactions; formal contact events are a v2 item.
 
 ## Lifecycle & safety
 
-- The host's manifest contract is exactly two fields: `"name"` and
-  `"main"` (presence of `main` spawns a cell). Everything else in
-  manifest.json is pack-private configuration, delivered untouched to the
-  cell as `buddy.manifest` — the swordfighter's `llc`/`hlc_strike` entries
-  are its own file references, never read by the host.
+- There is no manifest: a pack is any folder containing `main.js`. The
+  folder name is the pack ID and default display name. Display metadata is
+  exported from main.js — `export const meta = {name, description, author,
+  version}` — read *inside the cell* after the module loads (the host never
+  executes pack code) and relayed back as sanitized strings. All other
+  configuration is the pack's own business: constants in main.js or files
+  it reads via `buddy.assets`.
 - Harness boots packcat + protocol + SDK + your main from blob URLs inside a
   `sandbox="allow-scripts"` iframe (null origin: no `window.go`, no storage,
   no network; `wasm-unsafe-eval` enabled for your own WASM).

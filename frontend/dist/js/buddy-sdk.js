@@ -93,7 +93,7 @@ class NodeHandle {
 
 const buddy = {
     get id() { return initData.instanceId; },
-    get manifest() { return initData.manifest; },
+    get packName() { return initData.packName; }, // folder name; display name comes from your `export const meta`
     get screen() { return initData.screen; },
 
     onFrame(cb) { state.frameCb = cb; },
