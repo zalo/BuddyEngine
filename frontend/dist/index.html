@@ -30,7 +30,8 @@
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
-<script src="./vendor/ort.wasm.min.js"></script>
+<!-- onnxruntime is vendored (served to buddy cells via sys:vendor/) but
+     never executed on the main thread: all ONNX evaluation happens in-cell. -->
 <script type="module" src="./js/main.js"></script>
 </body>
 </html>

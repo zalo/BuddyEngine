@@ -189,7 +189,11 @@ emergent interactions; formal contact events are a v2 item.
 
 ## Lifecycle & safety
 
-- Pack manifest gains `"main": "main.js"` — presence of `main` spawns a cell.
+- The host's manifest contract is exactly two fields: `"name"` and
+  `"main"` (presence of `main` spawns a cell). Everything else in
+  manifest.json is pack-private configuration, delivered untouched to the
+  cell as `buddy.manifest` — the swordfighter's `llc`/`hlc_strike` entries
+  are its own file references, never read by the host.
 - Harness boots packcat + protocol + SDK + your main from blob URLs inside a
   `sandbox="allow-scripts"` iframe (null origin: no `window.go`, no storage,
   no network; `wasm-unsafe-eval` enabled for your own WASM).
