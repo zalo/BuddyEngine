@@ -169,11 +169,51 @@ function buildObservation(world, supportZ) {
     return obs;
 }
 
-// ASE strike task obs (15): the cursor's physics proxy is the target.
+// ---------------------------------------------------------------------------
+// Target selection: hunt the nearest foreign root object — the cursor's
+// physics proxy or any other buddy's root body (wisp ball, kirby, another
+// rig's pelvis). Hysteresis keeps it committed until something else is
+// meaningfully closer, then it switches victims.
+// ---------------------------------------------------------------------------
+let targetId = 'sys/target';
+let nearestPreyDist = Infinity; // nearest non-cursor candidate (for idle gating)
+
+function pickTarget(world, root) {
+    const cands = [];
+    const cursorBody = world.bodies.get('sys/target');
+    if (cursorBody) cands.push(['sys/target', cursorBody]);
+    // First body per foreign owner = its root (rig roots precede their
+    // links in the snapshot; plain buddies lead with their main body).
+    const seen = new Set([buddy.id, 'sys']);
+    for (const [id, b] of world.bodies) {
+        const owner = id.split('/')[0];
+        if (seen.has(owner)) continue;
+        seen.add(owner);
+        cands.push([id, b]);
+    }
+    const dist = (b) => Math.hypot(b.pos[0] - root.pos[0], b.pos[2] - root.pos[2]);
+
+    let bestId = 'sys/target', bestD = Infinity;
+    nearestPreyDist = Infinity;
+    for (const [id, b] of cands) {
+        const d = dist(b);
+        if (d < bestD) { bestD = d; bestId = id; }
+        if (id !== 'sys/target' && d < nearestPreyDist) nearestPreyDist = d;
+    }
+
+    const cur = world.bodies.get(targetId);
+    if (!cur) { targetId = bestId; return; }
+    if (bestId !== targetId && bestD < dist(cur) * 0.75) {
+        targetId = bestId;
+        buddy.log('new target: ' + targetId);
+    }
+}
+
+// ASE strike task obs (15) against the currently hunted body.
 function buildTaskObs(world, supportZ) {
     const taskObs = new Float32Array(15);
     const root = world.bodies.get(rootBodyId);
-    const tar = world.bodies.get('sys/target');
+    const tar = world.bodies.get(targetId) || world.bodies.get('sys/target');
     if (!root || !tar) return taskObs;
 
     const headingInv = M.calcHeadingQuatInv(root.quat);
@@ -280,7 +320,8 @@ buddy.onFrame(async (world) => {
         lastCursorMove = world.time;
     }
 
-    if (world.time - lastCursorMove > IDLE_AFTER_S) {
+    // Idle only when the cursor is resting AND no prey is worth chasing.
+    if (world.time - lastCursorMove > IDLE_AFTER_S && nearestPreyDist > 5) {
         if (mode !== 'idle') { mode = 'idle'; latent = sampleUnitLatent(); latentTarget = latent.slice(); }
         if (world.time - lastIdleSkill > IDLE_NEW_SKILL_S) {
             latentTarget = sampleUnitLatent();
@@ -296,6 +337,7 @@ buddy.onFrame(async (world) => {
     try {
         const root = world.bodies.get(rootBodyId);
         if (!root) return;
+        pickTarget(world, root);
         const supportZ = supportHeightAt(world.colliders, root.pos[0], root.pos[2]);
         const obs = buildObservation(world, supportZ);
         if (!obs) return;
