@@ -75,9 +75,27 @@ async function boot() {
     });
     interact.cartMgr = cartMgr;
 
-    // Every discovered pack is a folder with a main.js — spawn them all.
+    // Every discovered pack is a folder with a main.js — spawn them all,
+    // one at a time: cells share the main thread, so booting every pack at
+    // once compounds their load work into one long freeze. Each spawn waits
+    // for the previous cell to finish evaluating (harness 'booted' signal)
+    // or a timeout, while the world keeps running.
     const packs = bootstrap.packs || [];
-    for (const p of packs) cartMgr.spawn(p);
+    (async () => {
+        for (const p of packs) {
+            try {
+                const id = await cartMgr.spawn(p);
+                const t0 = performance.now();
+                while (performance.now() - t0 < 8000) {
+                    const cell = cartMgr.cells.get(id);
+                    if (!cell || cell.booted) break;
+                    await new Promise(r => setTimeout(r, 120));
+                }
+            } catch (e) {
+                logToBackend('spawn ' + p.id + ' failed: ' + e.message);
+            }
+        }
+    })();
     if (packs.length === 0) {
         logToBackend('no packs found — drop pack folders (containing main.js) into the workshop folder');
     }

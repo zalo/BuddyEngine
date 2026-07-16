@@ -96,6 +96,7 @@ export const OPS = {
     ASSET_FETCH: 'asset.fetch',     // {reqId, path} -> host replies {t:'asset', reqId, bytes|error}
     BUS_SEND: 'bus.send',           // {to:'b<N>'|'*', topic, data} — data is structured-clone JSON
     READY: 'ready',                 // {} — first command a cell must send
+    BOOTED: 'booted',               // {} — sent by the harness once the pack module finished evaluating (or failed); spawn staggering waits on it
     LOG: 'log',                     // {msg}
     META: 'meta',                   // {name?, description?, author?, version?} — relayed from the pack's `export const meta`
 };

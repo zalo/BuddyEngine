@@ -37,6 +37,9 @@ const HARNESS = `<!doctype html><html><head>
     } catch (err) {
       parent.postMessage({ t: 'commands', cmds: [{ op: 'log', msg: 'cell boot error: ' + (err.stack || err) }] }, '*');
     }
+    // Module fully evaluated (top-level awaits included) or boot failed —
+    // either way the host may start the next pack.
+    parent.postMessage({ t: 'commands', cmds: [{ op: 'booted' }] }, '*');
   });
 })();
 <\/script></body></html>`;
@@ -51,6 +54,7 @@ class Cell {
         this.meta = {};
         this.id = 'b' + (++cellCounter);
         this.ready = false;
+        this.booted = false;  // pack main fully evaluated (or failed)
         this.dead = false;
         this.spawnedAt = performance.now();
         this.pendingPhys = [];
@@ -181,11 +185,23 @@ export class CartridgeManager {
             if (!resp.ok) throw new Error('sys asset missing: ' + sub);
             return resp.arrayBuffer();
         }
+        // Prefer a binary side-channel when the backend offers one (the web
+        // shim does) — skips the base64 round-trip entirely.
+        if (window.go.main.App.ReadPackBytes) {
+            return window.go.main.App.ReadPackBytes(pack.id, path);
+        }
         const b64 = await window.go.main.App.ReadPackFile(pack.id, path);
-        const bin = atob(b64);
-        const buf = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-        return buf.buffer;
+        // Native decode: a per-byte JS loop over multi-MB assets froze the
+        // main loop (and every buddy with it) while big packs booted.
+        try {
+            const r = await fetch('data:application/octet-stream;base64,' + b64);
+            return await r.arrayBuffer();
+        } catch (e) {
+            const bin = atob(b64);
+            const buf = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+            return buf.buffer;
+        }
     }
 
     async readPackText(pack, path) {
@@ -217,6 +233,9 @@ export class CartridgeManager {
         switch (c.op) {
             case OPS.READY:
                 cell.ready = true;
+                break;
+            case OPS.BOOTED:
+                cell.booted = true;
                 break;
             case OPS.LOG:
                 this.log(`[${cell.id} ${cell.name}] ${String(c.msg).slice(0, 500)}`);

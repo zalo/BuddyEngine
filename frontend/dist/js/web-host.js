@@ -12,10 +12,10 @@ const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
 const TASKBAR_CSS = IS_MOBILE ? 44 : 36;
 const PPM = (IS_MOBILE ? 90 : 140) * DPR;
 
-// Packs that can't run on the static site (sm64 needs a user-supplied ROM).
-const WEB_EXCLUDED = new Set(['sm64']);
-const MOBILE_DEFAULT = ['live2d', 'kirby', 'wisp'];
-const FALLBACK_PACKS = ['swordfighter', 'kirby', 'wisp', 'live2d', 'stickman', 'interactive-buddy'];
+// Excluded by default (still available via ?packs=): sm64 needs a
+// user-supplied ROM that never ships; stickman is a bit of a menace.
+const WEB_EXCLUDED = new Set(['sm64', 'stickman']);
+const FALLBACK_PACKS = ['swordfighter', 'kirby', 'wisp', 'live2d', 'interactive-buddy'];
 
 async function packList() {
     const param = new URLSearchParams(location.search).get('packs');
@@ -27,9 +27,7 @@ async function packList() {
         const r = await fetch('./packs-index.json');
         if (r.ok) ids = await r.json();
     } catch (e) { /* fall back */ }
-    ids = ids.filter(id => !WEB_EXCLUDED.has(id));
-    if (IS_MOBILE) ids = ids.filter(id => MOBILE_DEFAULT.includes(id));
-    return ids;
+    return ids.filter(id => !WEB_EXCLUDED.has(id));
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +75,13 @@ window.go = { main: { App: {
         const r = await fetch(`./packs/${packId}/${rel}`);
         if (!r.ok) throw new Error(`pack file missing: ${packId}/${rel}`);
         return bufToB64(await r.arrayBuffer());
+    },
+    // Binary fast path (cartridges prefers it): no base64 round-trip, no
+    // main-thread stalls on multi-MB pack assets.
+    async ReadPackBytes(packId, rel) {
+        const r = await fetch(`./packs/${packId}/${rel}`);
+        if (!r.ok) throw new Error(`pack file missing: ${packId}/${rel}`);
+        return r.arrayBuffer();
     },
     async RefreshPacks() { return packs; },
     SetClickThrough() {},
@@ -212,6 +217,20 @@ window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => location.reload(), 600);
 });
+
+// Boot-time responsiveness telemetry: log the worst main-thread stall while
+// packs load, so asset-pipeline regressions show up in the console.
+(() => {
+    let last = performance.now(), worst = 0;
+    const tick = () => {
+        const now = performance.now();
+        worst = Math.max(worst, now - last);
+        last = now;
+        if (now < 30000) requestAnimationFrame(tick);
+        else console.log(`[web-host] worst main-thread stall during boot: ${worst.toFixed(0)}ms`);
+    };
+    requestAnimationFrame(tick);
+})();
 
 // ---------------------------------------------------------------------------
 // Boot the unmodified host, then layer its canvas into the XP stack
