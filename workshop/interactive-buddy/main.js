@@ -23,7 +23,11 @@ buddy.log('interactive buddy booting, instance', buddy.id);
 // ---------------------------------------------------------------------------
 const FPS = 36, DT = 1 / FPS;
 const SIZE = 1.35;                       // visual scale multiplier
-const S = SIZE / buddy.screen.ppm;       // meters per game-px
+// Meters per game-px, pinned to the native desktop scale (ppm 140) so the
+// buddy keeps a fixed world size like every other pack. Dividing by the
+// live ppm instead pinned it to physical pixels — on hidpi/mobile hosts
+// (ppm scales with devicePixelRatio) it shrank relative to everyone else.
+const S = SIZE / 140;
 const V = FPS * S;                       // (px/frame) -> (m/s)
 
 const DAMP = 0.225;                      // spring gain
