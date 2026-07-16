@@ -17,15 +17,27 @@
     const SITE = 'https://zalo.github.io';
     const OVERLAY_URL = SITE + '/BuddyEngine/overlay.html';
 
+    // ?page=WxH tells the overlay the full page viewport: the engine's
+    // world spans the page even while the iframe itself is form-fitted to
+    // the buddies' bounding box (be.viewport messages below).
     const iframe = document.createElement('iframe');
     iframe.id = '__buddyengine_overlay';
-    iframe.src = OVERLAY_URL;
+    iframe.src = OVERLAY_URL + '?page=' + innerWidth + 'x' + innerHeight;
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText =
-        'position:fixed; inset:0; width:100vw; height:100vh; border:none;' +
-        'background:transparent; pointer-events:none; z-index:2147483646;' +
-        'color-scheme:normal;';
+    const baseStyle =
+        'position:fixed; border:none; background:transparent;' +
+        'pointer-events:none; z-index:2147483646; color-scheme:normal;';
+    iframe.style.cssText = baseStyle + 'inset:0; width:100vw; height:100vh;';
     document.documentElement.appendChild(iframe);
+
+    // Real page resizes (rotation, window resize) rebuild the world.
+    const bootW = innerWidth, bootH = innerHeight;
+    let reloadTimer = 0;
+    window.addEventListener('resize', () => {
+        if (Math.abs(innerWidth - bootW) < 80 && Math.abs(innerHeight - bootH) < 160) return;
+        clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => location.reload(), 800);
+    });
 
     const post = (msg) => {
         try { iframe.contentWindow && iframe.contentWindow.postMessage(msg, SITE); } catch (e) {}
@@ -41,11 +53,20 @@
         window.addEventListener(type, fwd, { passive: true, capture: true });
     }
 
-    // ---- click-through toggle (overlay -> page) ---------------------------
+    // ---- overlay -> page: click-through toggle + form-fit rect -----------
     window.addEventListener('message', (e) => {
         if (e.origin !== SITE || !e.data) return;
         if (e.data.t === 'be.clickthrough') {
             iframe.style.pointerEvents = e.data.enabled ? 'none' : 'auto';
+        } else if (e.data.t === 'be.viewport') {
+            // Shrink the iframe to the buddies' bounding box — most of the
+            // page stops paying compositor fillrate for empty transparency.
+            const n = (v, max) => Math.max(0, Math.min(Math.round(+v) || 0, max));
+            iframe.style.inset = 'auto'; // shorthand resets left/top — clear it first
+            iframe.style.left = n(e.data.x, innerWidth) + 'px';
+            iframe.style.top = n(e.data.y, innerHeight) + 'px';
+            iframe.style.width = n(e.data.w, innerWidth) + 'px';
+            iframe.style.height = n(e.data.h, innerHeight) + 'px';
         }
     });
 

@@ -19,6 +19,38 @@ let iconColliders = false; // off by default; toggle in the buddy/tray menu
 let escapeCheck = 0;
 let frameCounter = 0;
 
+// ---------------------------------------------------------------------------
+// Power governor: cap the whole engine at 30fps when the machine is power
+// constrained. The OS "battery saver" bit isn't exposed to web content, so
+// the signals are: discharging battery (Battery API), sustained CPU
+// pressure (Compute Pressure API), or an explicit ?fps= override. Skipped
+// frames cost one rAF callback; the fixed-step sim catches up via its
+// accumulator, so physics stays identical.
+// ---------------------------------------------------------------------------
+const fpsOverride = +(new URLSearchParams(location.search).get('fps')) || 0;
+let onBattery = false;
+let cpuPressure = 'nominal';
+if (navigator.getBattery) {
+    navigator.getBattery().then((b) => {
+        const update = () => { onBattery = !b.charging; };
+        b.addEventListener('chargingchange', update);
+        update();
+    }).catch(() => {});
+}
+if (typeof PressureObserver !== 'undefined') {
+    try {
+        new PressureObserver((records) => {
+            cpuPressure = records[records.length - 1].state;
+        }).observe('cpu');
+    } catch (e) {}
+}
+function fpsCap() {
+    if (fpsOverride) return fpsOverride;
+    if (onBattery || cpuPressure === 'serious' || cpuPressure === 'critical') return 30;
+    return 0; // uncapped (display rate)
+}
+let lastRenderTs = 0;
+
 function setStatus(msg) {
     const el = document.getElementById('loadStatus');
     if (el) el.textContent = msg;
@@ -122,6 +154,15 @@ async function boot() {
 function mainLoop(timestamp) {
     if (!running) return;
     lastLoopTs = performance.now();
+
+    // Power cap: skip whole frames (sim, cell pump and render together) so
+    // a 30fps cap really halves the work, not just the paints.
+    const cap = fpsCap();
+    if (cap && timestamp - lastRenderTs < 1000 / cap - 1) {
+        requestAnimationFrame(mainLoop);
+        return;
+    }
+    lastRenderTs = timestamp;
 
     const realDT = Math.min((timestamp - lastSimTimestamp) / 1000, 0.1);
     lastSimTimestamp = timestamp;

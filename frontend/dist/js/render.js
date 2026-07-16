@@ -49,12 +49,58 @@ export class Renderer {
 
         this.targetMesh = null;
 
+        // The rect of the desktop (physical px) this canvas currently shows.
+        // Default: the whole screen. A form-fitting host (the extension
+        // overlay) narrows it to the buddies' bounding box via
+        // setViewportRect, and projectToScreen stays in full-desktop space.
+        this.viewRect = { x: 0, y: 0, w: desk.screenW, h: desk.screenH };
+
         // Debug collider visualization.
         this.debugGroup = new THREE.Group();
         this.debugGroup.visible = true;
         this.scene.add(this.debugGroup);
         this.debugMeshes = new Map(); // collider key -> { group, box }
         this.debugTarget = null;
+
+        // Debug outline of the current viewport window (magenta), visible
+        // with the collider debug layer — shows what a form-fitting host is
+        // actually compositing.
+        const outlineGeo = new THREE.BufferGeometry();
+        outlineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(4 * 3), 3));
+        this.viewportOutline = new THREE.LineLoop(
+            outlineGeo,
+            new THREE.LineBasicMaterial({ color: 0xff33cc }),
+        );
+        this.viewportOutline.visible = false;
+        this.debugGroup.add(this.viewportOutline);
+    }
+
+    // Show a sub-rect of the desktop (physical px): resize the drawing
+    // buffer to it and shift the ortho window so world content stays glued
+    // to desktop coordinates. Call from a resize observer — i.e. after the
+    // host window actually changed — so the camera and the canvas update in
+    // the same visual frame.
+    setViewportRect(px, py, wPx, hPx) {
+        const dpr = window.devicePixelRatio || 1;
+        this.viewRect = { x: px, y: py, w: wPx, h: hPx };
+        this.renderer.setSize(wPx / dpr, hPx / dpr);
+        const tl = this.desk.toWorld(px, py);
+        const br = this.desk.toWorld(px + wPx, py + hPx);
+        this.camera.left = tl.x;
+        this.camera.right = br.x;
+        this.camera.top = tl.z;
+        this.camera.bottom = br.z;
+        this.camera.updateProjectionMatrix();
+
+        // Outline slightly inset so it isn't clipped by the window edge.
+        const inset = 2 * dpr / this.desk.ppm;
+        const a = { x: tl.x + inset, z: tl.z - inset };
+        const b = { x: br.x - inset, z: br.z + inset };
+        const pos = this.viewportOutline.geometry.attributes.position;
+        pos.array.set([a.x, 0, a.z, b.x, 0, a.z, b.x, 0, b.z, a.x, 0, b.z]);
+        pos.needsUpdate = true;
+        this.viewportOutline.geometry.computeBoundingSphere();
+        this.viewportOutline.visible = true;
     }
 
     setDebugVisible(v) {
@@ -245,11 +291,14 @@ export class Renderer {
     }
 
     // Screen-space (CSS px) position of a world point.
+    // World -> CSS px in *full desktop* space (not window-local), so hit
+    // testing keeps working when the viewport is a form-fitted sub-rect.
     projectToScreen(wx, wy, wz) {
+        const dpr = window.devicePixelRatio || 1;
         const v = new THREE.Vector3(wx, wy, wz).project(this.camera);
         return {
-            x: (v.x + 1) / 2 * window.innerWidth,
-            y: (1 - v.y) / 2 * window.innerHeight,
+            x: ((v.x + 1) / 2 * this.viewRect.w + this.viewRect.x) / dpr,
+            y: ((1 - v.y) / 2 * this.viewRect.h + this.viewRect.y) / dpr,
         };
     }
 }

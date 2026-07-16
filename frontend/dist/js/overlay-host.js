@@ -17,6 +17,18 @@ const DPR = window.devicePixelRatio || 1;
 const IS_MOBILE = matchMedia('(pointer: coarse)').matches;
 const PPM = (IS_MOBILE ? 90 : 140) * DPR;
 
+// Embedded form-fit mode: the content script passes the page viewport via
+// ?page=WxH and then keeps our iframe resized to the buddies' bounding box
+// (be.viewport messages we send it). The engine's world stays in full-page
+// coordinates; only the rendered window moves. Standalone (no parent /
+// no param) stays fullscreen.
+const pageParam = /^(\d+)x(\d+)$/.exec(new URLSearchParams(location.search).get('page') || '');
+const EMBEDDED = window.parent !== window && !!pageParam;
+const PAGE_W = EMBEDDED ? +pageParam[1] : innerWidth;   // CSS px
+const PAGE_H = EMBEDDED ? +pageParam[2] : innerHeight;
+// Where our window currently sits on the page (CSS px, page coords).
+const curRect = { x: 0, y: 0, w: PAGE_W, h: PAGE_H };
+
 const WEB_EXCLUDED = new Set(['sm64', 'stickman']);
 const FALLBACK_PACKS = ['swordfighter', 'kirby', 'wisp', 'live2d', 'interactive-buddy'];
 
@@ -56,9 +68,9 @@ const packs = (await packList()).map(id => ({ id, name: id, source: 'web' }));
 window.go = { main: { App: {
     async GetBootstrap() {
         return {
-            screenW: Math.round(innerWidth * DPR),
-            screenH: Math.round(innerHeight * DPR),
-            workBottom: Math.round(innerHeight * DPR), // ground = viewport bottom
+            screenW: Math.round(PAGE_W * DPR),
+            screenH: Math.round(PAGE_H * DPR),
+            workBottom: Math.round(PAGE_H * DPR), // ground = viewport bottom
             ppm: PPM,
             debugOff: true,
             packs,
@@ -93,12 +105,15 @@ function pushCursor(cssX, cssY, l, r) {
     if (r !== undefined) cursor.r = r;
     emit('cursor', { ...cursor });
 }
+// Our own DOM events are window-local; the engine works in page coords.
+const ownCursor = (e) =>
+    pushCursor(e.clientX + curRect.x, e.clientY + curRect.y, !!(e.buttons & 1), !!(e.buttons & 2));
 window.addEventListener('pointerdown', (e) => {
     if (e.target.closest && e.target.closest('#menu')) return;
-    pushCursor(e.clientX, e.clientY, !!(e.buttons & 1), !!(e.buttons & 2));
+    ownCursor(e);
 });
-window.addEventListener('pointermove', (e) => pushCursor(e.clientX, e.clientY, !!(e.buttons & 1), !!(e.buttons & 2)));
-window.addEventListener('pointerup', (e) => pushCursor(e.clientX, e.clientY, !!(e.buttons & 1), !!(e.buttons & 2)));
+window.addEventListener('pointermove', ownCursor);
+window.addEventListener('pointerup', ownCursor);
 window.addEventListener('pointercancel', () => pushCursor(cursor.x / DPR, cursor.y / DPR, false, false));
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -121,14 +136,18 @@ window.addEventListener('message', (e) => {
     }
 });
 
-// Rebuild on real viewport changes (rotation, window resize).
-const bootW = innerWidth, bootH = innerHeight;
-let resizeTimer = 0;
-window.addEventListener('resize', () => {
-    if (Math.abs(innerWidth - bootW) < 80 && Math.abs(innerHeight - bootH) < 160) return;
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => location.reload(), 600);
-});
+// Standalone only: rebuild on real viewport changes (rotation, window
+// resize). Embedded windows resize constantly by design — the content
+// script owns page-rotation reloads there.
+if (!EMBEDDED) {
+    const bootW = innerWidth, bootH = innerHeight;
+    let resizeTimer = 0;
+    window.addEventListener('resize', () => {
+        if (Math.abs(innerWidth - bootW) < 80 && Math.abs(innerHeight - bootH) < 160) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => location.reload(), 600);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Boot the unmodified host
@@ -145,3 +164,99 @@ const layerCanvas = setInterval(() => {
     // Tell the content script we're alive (it can hide any placeholder).
     try { parent.postMessage({ t: 'be.ready' }, '*'); } catch (e) {}
 }, 50);
+
+// ---------------------------------------------------------------------------
+// Form-fit: keep the iframe hugging the buddies (+ padding) instead of
+// covering the page, to cut compositor fillrate over empty transparency.
+// Flow: compute bbox -> ask the parent to resize us (be.viewport) -> apply
+// the camera/canvas + cell-iframe offsets only when OUR resize event fires,
+// so the ortho window updates in the same visual frame as the new viewport
+// (styling the iframe and the child observing it are not synchronous).
+// ---------------------------------------------------------------------------
+if (EMBEDDED) {
+    const PAD_M = 1.3;          // meters around each body (covers view canvases, bubbles)
+    const GRID = 64;            // quantize the rect so resizes are rare
+    const MIN_W = 320, MIN_H = 280;
+    let pending = null;         // rect requested from the parent, not yet observed
+    let pendingAt = 0;
+
+    function fitRect() {
+        const dbg = window.buddyDebug;
+        if (!dbg) return null;
+        const snap = dbg.sim.snapshotBodies();
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, n = 0;
+        snap.ids.forEach((id, i) => {
+            if (id === 'sys/target') return;
+            const x = snap.buf[i * 13], z = snap.buf[i * 13 + 2];
+            x0 = Math.min(x0, x - PAD_M); x1 = Math.max(x1, x + PAD_M);
+            z0 = Math.min(z0, z - PAD_M); z1 = Math.max(z1, z + PAD_M);
+            n++;
+        });
+        if (!n) return { x: 0, y: 0, w: PAGE_W, h: PAGE_H };
+        // world -> page CSS px (y flips: high z = small y)
+        const tl = dbg.desk.toScreen(x0, z1), br = dbg.desk.toScreen(x1, z0);
+        let rx = tl.x / DPR, ry = tl.y / DPR, rw = br.x / DPR - rx, rh = br.y / DPR - ry;
+        // outward-quantize, clamp to the page, enforce a working minimum
+        rx = Math.floor(rx / GRID) * GRID;
+        ry = Math.floor(ry / GRID) * GRID;
+        rw = Math.ceil((rw + GRID) / GRID) * GRID;
+        rh = Math.ceil((rh + GRID) / GRID) * GRID;
+        rw = Math.max(rw, MIN_W); rh = Math.max(rh, MIN_H);
+        rx = Math.max(0, Math.min(rx, PAGE_W - rw));
+        ry = Math.max(0, Math.min(ry, PAGE_H - rh));
+        rw = Math.min(rw, PAGE_W - rx); rh = Math.min(rh, PAGE_H - ry);
+        return { x: rx, y: ry, w: rw, h: rh };
+    }
+
+    function offsetCellIframes() {
+        // DOM-view cells position content in page coords; counter-shift
+        // their (page-sized) iframes so their pixels stay put on the page.
+        for (const f of document.querySelectorAll('body > iframe')) {
+            if (f.style.display === 'none') continue;
+            const s = f.style;
+            s.width = PAGE_W + 'px';
+            s.height = PAGE_H + 'px';
+            s.inset = 'auto';
+            s.left = -curRect.x + 'px';
+            s.top = -curRect.y + 'px';
+        }
+    }
+
+    function applyRect(r) {
+        curRect.x = r.x; curRect.y = r.y; curRect.w = r.w; curRect.h = r.h;
+        const dbg = window.buddyDebug;
+        if (dbg) dbg.renderer.setViewportRect(r.x * DPR, r.y * DPR, r.w * DPR, r.h * DPR);
+        offsetCellIframes();
+    }
+
+    window.addEventListener('resize', () => {
+        if (pending && Math.abs(innerWidth - pending.w) <= 2 && Math.abs(innerHeight - pending.h) <= 2) {
+            applyRect(pending);
+            pending = null;
+        }
+    });
+
+    // Right-click menu positions come from page-space cursor coords; the
+    // menu itself lives in window space.
+    const hookMenu = setInterval(() => {
+        const dbg = window.buddyDebug;
+        if (!dbg || !dbg.interact.onRightClick) return;
+        clearInterval(hookMenu);
+        const orig = dbg.interact.onRightClick;
+        dbg.interact.onRightClick = (cssX, cssY) => orig(cssX - curRect.x, cssY - curRect.y);
+    }, 200);
+
+    setInterval(() => {
+        if (pending && performance.now() - pendingAt > 400) pending = null; // parent missed it; retry
+        if (pending) return;
+        const r = fitRect();
+        if (!r) return;
+        if (r.x === curRect.x && r.y === curRect.y && r.w === curRect.w && r.h === curRect.h) {
+            offsetCellIframes(); // late view.show may have reset styles
+            return;
+        }
+        pending = r;
+        pendingAt = performance.now();
+        try { parent.postMessage({ t: 'be.viewport', ...r }, '*'); } catch (e) { pending = null; }
+    }, 150);
+}

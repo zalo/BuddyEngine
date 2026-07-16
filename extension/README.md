@@ -61,6 +61,19 @@ way the mobile web demo is: tap-drag grabs a buddy.
 - Firefox: `about:debugging` → This Firefox → Load Temporary Add-on →
   pick `extension/manifest.json`.
 
+## Performance
+
+The iframe doesn't stay fullscreen: the engine streams `be.viewport`
+rects and the content script form-fits the iframe to the buddies'
+bounding box (+ padding, quantized to a 64px grid), so the page only pays
+compositor fillrate where buddies actually are. The engine keeps
+simulating in full-page coordinates; the ortho camera window and the
+buddy-cell iframes are counter-shifted when the child observes its own
+resize, so nothing visually jumps. The engine also self-caps to 30fps on
+battery power or sustained CPU pressure (`?fps=N` on the overlay URL
+forces a cap). With engine debug colliders on, the current window
+boundary is drawn in magenta.
+
 ## Notes / limits
 
 - Sites with strict `frame-src` CSP block the overlay iframe entirely.
