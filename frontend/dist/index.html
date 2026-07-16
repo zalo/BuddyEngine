@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuddyEngine</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body style="--wails-draggable:no-drag">
+
+<div id="overlay">
+    <div class="card">
+        <h1>BuddyEngine</h1>
+        <div class="spinner"></div>
+        <div class="status" id="loadStatus">Initializing...</div>
+    </div>
+</div>
+
+<div id="menu">
+    <div class="menu-title">Buddy</div>
+    <button id="menu-reset">Reset buddy</button>
+    <button id="menu-debug">Debug colliders: on</button>
+    <button id="menu-icons">Icon colliders: off</button>
+    <button id="menu-packs">Workshop packs...</button>
+    <button id="menu-close">Close menu</button>
+    <hr>
+    <button id="menu-quit" class="danger">Quit BuddyEngine</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script src="./vendor/ort.wasm.min.js"></script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
