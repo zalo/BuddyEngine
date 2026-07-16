@@ -206,7 +206,9 @@ export class SimWorld {
     createTarget() {
         const PhysX = this.PhysX;
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
-        const geom = new PhysX.PxBoxGeometry(0.12, 0.12, 0.12);
+        // Extends through the whole depth channel so it's hittable
+        // regardless of any residual Y drift.
+        const geom = new PhysX.PxBoxGeometry(0.12, 5.0, 0.12);
         const shape = this.physics.createShape(geom, this.material, true, shapeFlags);
         // Cursor layer: articulations collide with it (sword feedback);
         // buddy objects ignore it unless they opt in via collidesCursor.
@@ -283,6 +285,10 @@ export class SimWorld {
         if (typeof actor.setMaxLinearVelocity === 'function') actor.setMaxLinearVelocity(80.0);
 
         const lock = desc.lock || {};
+        // All buddy bodies live in the desktop plane by default (linear Y
+        // locked). Opt out with {planeLock: false}; planar2D additionally
+        // locks out-of-plane rotation for sprite-style motion.
+        if (desc.planeLock !== false) lock.linY = true;
         if (desc.planar2D) {
             lock.linY = true;
             lock.angX = true;
@@ -431,6 +437,9 @@ export class SimWorld {
 
             joint.setJointType(jdata.jointType === 'spherical' ? E.SPHERICAL : E.REVOLUTE);
             joint.setFrictionCoefficient(0);
+            // Unbounded, matching the training sim — capping this changes
+            // the PD dynamics the policies were trained on. Blowups are
+            // handled by rebuild-on-NaN + the frontend watchdog instead.
             if (typeof joint.setMaxJointVelocity === 'function') joint.setMaxJointVelocity(1000000);
 
             const lp = jdata.localPos0;
@@ -489,7 +498,39 @@ export class SimWorld {
         const rec = { fq, articulation, links, data, dofAxes, bodyLinkMap };
         this.articulations.set(fq, rec);
         this.applyArticulationInit(fq, spawn);
+
+        // Plane lock for rigs happens by per-substep projection (see
+        // projectArticulationsToPlane) — articulation roots don't support
+        // rigid lock flags, and an external D6 constraint against the
+        // PD-driven rig proved numerically unstable.
+        rec.planeLock = data.planeLock !== false;
         return rec;
+    }
+
+    // Keep plane-locked rigs near the desktop plane with a critically
+    // damped spring force on the root link. Forces flow through the solver
+    // normally — per-substep root pose/velocity surgery destabilized the
+    // articulation (state surgery + ground contact = energy injection).
+    projectArticulationsToPlane() {
+        const PhysX = this.PhysX;
+        const K = 400, C = 40; // omega=20 rad/s, critically damped
+        for (const rec of this.articulations.values()) {
+            if (!rec.planeLock || !rec.links.length) continue;
+            try {
+                const root = rec.links[0].link;
+                const p = root.getGlobalPose().get_p();
+                const y = p.get_y();
+                const vy = root.getLinearVelocity().get_y();
+                if (!isFinite(y) || !isFinite(vy)) continue; // rescue net handles blowups
+                if (Math.abs(y) < 1e-4 && Math.abs(vy) < 1e-3) continue;
+                const m = root.getMass();
+                let f = m * (-K * y - C * vy);
+                const fMax = m * 600;
+                if (f > fMax) f = fMax;
+                else if (f < -fMax) f = -fMax;
+                root.addForce(new PhysX.PxVec3(0, f, 0));
+            } catch (e) {}
+        }
     }
 
     applyArticulationInit(fq, spawn) {
@@ -513,6 +554,15 @@ export class SimWorld {
             new PhysX.PxVec3(rp[0], rp[1], rp[2]),
             new PhysX.PxQuat(rq[0], rq[1], rq[2], rq[3])), true);
 
+        // Zero ALL velocity state — a hard hit can leave NaN velocities
+        // that would otherwise survive the reset and re-explode instantly.
+        try {
+            if (typeof rec.articulation.setRootLinearVelocity === 'function')
+                rec.articulation.setRootLinearVelocity(new PhysX.PxVec3(0, 0, 0), true);
+            if (typeof rec.articulation.setRootAngularVelocity === 'function')
+                rec.articulation.setRootAngularVelocity(new PhysX.PxVec3(0, 0, 0), true);
+        } catch (e) {}
+
         for (let i = 0; i < rec.dofAxes.length; i++) {
             const d = rec.dofAxes[i];
             if (!d.joint) continue;
@@ -521,6 +571,10 @@ export class SimWorld {
                 d.joint.setJointVelocity(d.axisEnum, 0);
             } catch (e) {}
         }
+
+        // FK refresh via cache (eALL, the demo-proven path). Root velocities
+        // were zeroed above, so the copy carries clean values; fully corrupt
+        // (NaN) rigs never take this path — they get rebuilt instead.
         const initFlags = new PhysX.PxArticulationCacheFlags(PhysX.PxArticulationCacheFlagEnum.eALL);
         const initCache = rec.articulation.createCache();
         rec.articulation.copyInternalStateToCache(initCache, initFlags);
@@ -531,6 +585,16 @@ export class SimWorld {
             if (!d.joint) continue;
             try { d.joint.setDriveTarget(d.axisEnum, initDof[i]); } catch (e) {}
         }
+    }
+
+    // Nuclear reset: tear the articulation down and rebuild it from its rig
+    // description. Used when internal state is corrupt (non-finite).
+    rebuildArticulation(fq, spawn) {
+        const rec = this.articulations.get(fq);
+        if (!rec) return;
+        const data = rec.data;
+        this.removeArticulation(fq);
+        this.createArticulation(fq, data, spawn);
     }
 
     setArticulationDriveTargets(fq, targets) {
@@ -700,16 +764,22 @@ export class SimWorld {
             rescued++;
         }
 
-        for (const fq of this.articulations.keys()) {
+        for (const fq of [...this.articulations.keys()]) {
             const root = this.articulationRootPose(fq);
             if (!root) continue;
             const [x, y, z] = root.pos;
-            if (isFinite(x) && isFinite(y) && isFinite(z) &&
-                Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
+            const finite = isFinite(x) && isFinite(y) && isFinite(z);
+            if (finite && Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
                 continue;
             }
-            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, isFinite(x) ? x : 0));
-            this.applyArticulationInit(fq, { x: nx });
+            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, finite ? x : 0));
+            if (finite) {
+                this.applyArticulationInit(fq, { x: nx });
+            } else {
+                // Non-finite = corrupt solver state; a soft reset isn't
+                // guaranteed to purge it. Rebuild from the rig description.
+                this.rebuildArticulation(fq, { x: nx });
+            }
             rescued++;
         }
         return rescued;
@@ -772,6 +842,7 @@ export class SimWorld {
     }
 
     step() {
+        this.projectArticulationsToPlane();
         this.scene.simulate(DT);
         this.scene.fetchResults(true);
     }

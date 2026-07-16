@@ -36,7 +36,11 @@ window.addEventListener('error', e => {
 window.addEventListener('unhandledrejection', e => {
     logToBackend('unhandled rejection: ' + (e.reason && e.reason.stack || e.reason));
 });
+// Beat only while the main loop is actually ticking — if the sim dies (e.g.
+// a WASM abort), beats stop and the Go watchdog reloads the frontend.
+let lastLoopTs = performance.now();
 setInterval(() => {
+    if (performance.now() - lastLoopTs > 4000) return;
     try { window.go.main.App.Heartbeat(); } catch (e) {}
 }, 1000);
 
@@ -95,6 +99,7 @@ async function boot() {
 
 function mainLoop(timestamp) {
     if (!running) return;
+    lastLoopTs = performance.now();
 
     const realDT = Math.min((timestamp - lastSimTimestamp) / 1000, 0.1);
     lastSimTimestamp = timestamp;

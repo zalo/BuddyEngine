@@ -117,7 +117,7 @@ export class Desk {
                     }
                     this.sim.removeStatic(key); // resized/re-trimmed: rebuild
                 }
-                this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 2.0, b.hz);
+                this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 6.0, b.hz);
             }
         }
         for (const key of this.windowKeys) {
@@ -146,7 +146,7 @@ export class Desk {
                 }
                 this.sim.removeStatic(key);
             }
-            this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 2.0, b.hz);
+            this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 6.0, b.hz);
         }
         for (const key of this.iconKeys) {
             if (!seen.has(key)) this.sim.removeStatic(key);

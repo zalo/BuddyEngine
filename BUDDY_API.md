@@ -85,9 +85,10 @@ const ball = buddy.phys.spawn('ball', {
   collides: 'all',                           // 'all' | 'world' (not other buddies) | 'none'
   collidesCursor: false,                     // opt into the cursor-target collision layer
                                              // (only the avatar hits it by default)
-  planar2D: true,                            // 2D-sprite motion: locks linear Y + angular X/Z,
-                                             // so it moves in the desktop plane and spins only
-                                             // around the depth axis
+  planeLock: true,                           // DEFAULT: linear Y locked — every body lives in
+                                             // the desktop plane unless it opts out
+  planar2D: true,                            // stronger: also locks angular X/Z so it spins
+                                             // only around the depth axis (sprite motion)
   lock: {linX, linY, linZ, angX, angY, angZ} // or pick individual DOF locks
 });
 ball.force([fx,fy,fz], point?); ball.impulse(...); ball.velocity(v, w);
@@ -107,6 +108,10 @@ rig.drive(targets)              // PD drive targets by dof index
 rig.linkBody('pelvis')          // world body id: '<me>/avatar.pelvis'
 rig.reset(x); rig.remove();
 ```
+
+Rigs are plane-locked by default too: articulation roots can't take rigid
+lock flags, so the host projects the root back to y=0 (rigid shift + Y
+velocity cancel) every substep (`rigData.planeLock = false` opts out).
 
 `rigData` is engine-agnostic: named links (collision geoms, mass/inertia/com),
 joints (spherical/revolute/fixed, axes, limits, PD stiffness/damping/maxForce,
