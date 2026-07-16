@@ -37,11 +37,13 @@ distributed). Without it the pack loads but stays dormant, logging one line.
 
 ## Behavior state machine
 
-`idle → wander → idle` strolling (occasionally targeting low window tops,
-jumping up onto them), `chase` the cursor after a double-poke, `flee` from
-fast-moving bodies, `hurt` (knockback, no input), `held`/`thrown` for
-grab-and-throw, `dead → respawn`. Single poke = jump. He watches the cursor
-when it lingers.
+`idle → wander → idle` strolling, `climb` expeditions — he periodically
+scouts reachable ledges (window tops, icons), walks to the edge, jumps up
+onto them (chaining SM64 double/triple jumps for taller targets, steering
+over the lip at the apex), and enjoys the view — `chase` the cursor after a
+double-poke, `flee` from fast-moving bodies, `hurt` (knockback, no input),
+`held`/`thrown` for grab-and-throw, `dead → respawn`. Single poke = jump.
+He watches the cursor when it lingers.
 
 ## Rendering & audio
 

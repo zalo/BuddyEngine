@@ -124,7 +124,18 @@ const x0 = proxyPos()[0];
 let moved = 0;
 for (let i = 0; i < 60 * 4 && moved < 0.5; i++) { await run(0.25); moved = Math.max(moved, Math.abs(proxyPos()[0] - x0)); }
 check('wanders (moved ' + moved.toFixed(2) + 'm)', moved > 0.5);
-check('stays on ground plane (z=' + proxyPos()[2].toFixed(2) + ')', Math.abs(proxyPos()[2] - 0.31) < 0.25);
+const depth = globalThis.__mario.pos[2] / 256;
+check('stays in the desktop plane (depth=' + depth.toFixed(2) + 'm)', Math.abs(depth) < 0.45);
+
+// 1b. climbing: he should periodically decide to jump up onto the window
+// platform (top at 1.0m) and eventually stand on it
+let climbed = false;
+for (let i = 0; i < 180 * 2 && !climbed; i++) {
+    await run(0.5);
+    const p = proxyPos();
+    climbed = p[2] > 1.15 && Math.abs(p[0] - WIN.cx) < WIN.hx + 0.3;
+}
+check('climbs onto the window platform', climbed);
 
 // 2. moving platform: raise the ground under him — a surface object move
 // (window removed so he can't coincidentally be standing on it; wait until

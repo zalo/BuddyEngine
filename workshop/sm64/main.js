@@ -475,6 +475,7 @@ const mario = {
     health: HEALTH_FULL, action: ACT_IDLE, invinc: 0,
     grounded: true,
     target: HOME_X,      // wander/chase target x (m)
+    climb: null,         // {id, tries, lastJumpT, holdA} — ledge being mounted
     fleeFrom: 0,
     stuckT: 0,
     lastDmgT: -10,
@@ -600,30 +601,80 @@ function behave(world, now) {
             }
             if (mario.stateT > mario.idleDur) {
                 mario.idleDur = 2 + Math.random() * 6;
-                // pick a stroll target: nearby ground spot, or a low window top
-                const tops = world.colliders.filter(c =>
-                    c.kinematic && c.hx > 0.3 &&
-                    c.cz + c.hz > mzm + 0.2 && c.cz + c.hz < mzm + 1.05 &&
-                    Math.abs(c.cx - mxm) < 3.5);
-                if (tops.length && Math.random() < 0.5) {
-                    const t = tops[Math.floor(Math.random() * tops.length)];
-                    mario.target = t.cx + (Math.random() - 0.5) * t.hx;
+                // periodically go mountaineering: pick a reachable ledge
+                // (window top, icon) and try to jump up onto it
+                const ledges = findLedges(world.colliders, mxm, mzm);
+                if (ledges.length && Math.random() < 0.55) {
+                    const c = ledges[Math.floor(Math.random() * ledges.length)];
+                    mario.climb = { id: c.id, tries: 0, lastJumpT: -1, holdA: 0 };
+                    setState('climb');
                 } else {
                     mario.target = Math.max(-halfWm + 0.6, Math.min(halfWm - 0.6,
                         mxm + (Math.random() * 6 - 3)));
+                    setState('wander');
                 }
-                setState('wander');
             }
             break;
         }
         case 'wander': {
             const arrived = walkToward(mario.target, 0.45);
-            // climb: target above us and we're under its ledge -> jump
-            if (!arrived && mario.grounded) {
-                const support = supportTopAt(world.colliders, mario.target, mzm);
-                if (support > mzm + 0.25 && Math.abs(mario.target - mxm) < 0.9) inputs.a = 1;
+            // playful hop now and then
+            if (mario.grounded && Math.random() < 0.006) inputs.a = 1;
+            // a ledge passing close by is too tempting
+            if (mario.grounded && Math.random() < 0.01) {
+                const near = findLedges(world.colliders, mxm, mzm)
+                    .filter(c => Math.abs(c.cx - mxm) - c.hx < 1.5);
+                if (near.length) {
+                    mario.climb = { id: near[0].id, tries: 0, lastJumpT: -1, holdA: 0 };
+                    setState('climb');
+                    break;
+                }
             }
             if (arrived || mario.stateT > 9) setState('idle');
+            break;
+        }
+        case 'climb': {
+            const c = world.colliders.find(k => k.id === mario.climb.id);
+            const top = c ? c.cz + c.hz : 0;
+            // ledge vanished, moved out of reach, or drifted away: forget it
+            if (!c || !isSolidForMario(c) || top - mzm > 2.4 || Math.abs(c.cx - mxm) > 6) {
+                setState('idle');
+                break;
+            }
+            const dirIn = Math.sign(c.cx - mxm) || 1; // toward the platform
+            const onIt = mxm > c.cx - c.hx + 0.05 && mxm < c.cx + c.hx - 0.05 &&
+                Math.abs(mzm - top) < 0.15;
+            if (mario.grounded && onIt) {             // made it — enjoy the view
+                mario.idleDur = 4 + Math.random() * 5;
+                setState('idle');
+                break;
+            }
+            inputs.sy = Math.max(-0.3, Math.min(0.3, mario.pos[2] / 150));
+            if (mario.grounded) {
+                const edgeX = dirIn > 0 ? c.cx - c.hx : c.cx + c.hx;
+                const jumpSpot = edgeX - dirIn * 0.35; // stand just off the edge
+                if (mzm < top - 0.05 && Math.abs(mxm - jumpSpot) > 0.3) {
+                    walkToward(jumpSpot, 0.6);
+                } else {
+                    inputs.sx = -dirIn * 0.4;
+                    if (now - mario.climb.lastJumpT > 0.3) {
+                        // hop at the ledge; re-pressing right after a landing
+                        // chains SM64 double/triple jumps for taller targets
+                        mario.climb.lastJumpT = now;
+                        mario.climb.tries++;
+                        mario.climb.holdA = 10;        // hold A for full height
+                    }
+                }
+            } else {
+                // airborne: drift over the lip once above it, hug the wall below
+                inputs.sx = -dirIn * (mzm > top - 0.1 ? 0.85 : 0.2);
+            }
+            if (mario.climb.holdA > 0) { mario.climb.holdA--; inputs.a = 1; }
+            if (mario.stateT > 12 || mario.climb.tries > 6) { // not today
+                mario.target = Math.max(-halfWm + 0.6, Math.min(halfWm - 0.6,
+                    mxm - dirIn * 2.5));
+                setState('wander');
+            }
             break;
         }
         case 'chase': {
@@ -650,14 +701,20 @@ function behave(world, now) {
     return inputs;
 }
 
-function supportTopAt(colliders, x, aboveZ) {
-    let best = 0;
+// Standable ledges worth an expedition: real platforms (window strips,
+// icons) above Mario's feet but within chained-jump reach, not too far away.
+function findLedges(colliders, mxm, mzm) {
+    const out = [];
     for (const c of colliders) {
-        if (c.id.startsWith('sys/wall')) continue;
-        const top = c.cz + c.hz;
-        if (x >= c.cx - c.hx && x <= c.cx + c.hx && top > best && top < aboveZ + 1.4) best = top;
+        if (!isSolidForMario(c)) continue;
+        if (c.id.startsWith('sys/wall') || c.id === 'sys/ground') continue;
+        if (c.hx < 0.25) continue;                        // too narrow to stand on
+        const rel = c.cz + c.hz - mzm;
+        if (rel < 0.3 || rel > 2.2) continue;             // trivial or hopeless
+        if (Math.abs(c.cx - mxm) - c.hx > 4.5) continue;  // too far to bother
+        out.push(c);
     }
-    return best;
+    return out;
 }
 
 // ---------------------------------------------------------------------------
