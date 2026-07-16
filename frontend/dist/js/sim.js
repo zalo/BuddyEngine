@@ -196,12 +196,16 @@ export class SimWorld {
 
     // -- mouse target (kinematic box the HLC tries to strike) ---------------
 
+    // Collision groups (filter word0): 1=world statics, 2=avatar,
+    // 4=buddy-API objects, 8=cursor target. word1 = which groups I hit.
     createTarget() {
         const PhysX = this.PhysX;
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
         const geom = new PhysX.PxBoxGeometry(0.12, 0.12, 0.12);
         const shape = this.physics.createShape(geom, this.material, true, shapeFlags);
-        shape.setSimulationFilterData(new PhysX.PxFilterData(4, 3, 0, 0));
+        // Cursor layer: only the avatar collides with it (sword feedback);
+        // buddy objects ignore it unless they opt in via collidesCursor.
+        shape.setSimulationFilterData(new PhysX.PxFilterData(8, 2, 0, 0));
         const pose = new PhysX.PxTransform(
             new PhysX.PxVec3(2, 0, 0.9), new PhysX.PxQuat(0, 0, 0, 1));
         this.targetActor = this.physics.createRigidDynamic(pose);
@@ -214,12 +218,14 @@ export class SimWorld {
         if (!this.targetActor) return;
         const prev = this.targetState.pos;
         if (dt > 0) {
+            // Smooth the finite-difference velocity: at 120Hz a single-pixel
+            // cursor step reads as a large instantaneous spike.
             const maxV = 30;
-            this.targetState.vel = [
-                Math.max(-maxV, Math.min(maxV, (pos[0] - prev[0]) / dt)),
-                Math.max(-maxV, Math.min(maxV, (pos[1] - prev[1]) / dt)),
-                Math.max(-maxV, Math.min(maxV, (pos[2] - prev[2]) / dt)),
-            ];
+            const alpha = 0.25;
+            for (let i = 0; i < 3; i++) {
+                const raw = Math.max(-maxV, Math.min(maxV, (pos[i] - prev[i]) / dt));
+                this.targetState.vel[i] += alpha * (raw - this.targetState.vel[i]);
+            }
         }
         this.targetState.pos = pos.slice();
         const PhysX = this.PhysX;
@@ -259,7 +265,8 @@ export class SimWorld {
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
         const shape = this.physics.createShape(geom, mat, true, shapeFlags);
         const filters = { all: [4, 7], world: [4, 3], none: [4, 0] };
-        const f = filters[desc.collides || 'all'] || filters.all;
+        const f = (filters[desc.collides || 'all'] || filters.all).slice();
+        if (desc.collidesCursor) f[1] |= 8; // opt into the cursor layer
         shape.setSimulationFilterData(new PhysX.PxFilterData(f[0], f[1], 0, 0));
 
         const p = desc.pos || [0, 0, 1];
@@ -270,9 +277,28 @@ export class SimWorld {
         actor.attachShape(shape);
         PhysX.PxRigidBodyExt.prototype.setMassAndUpdateInertia(actor, Math.max(0.01, desc.mass || 1.0));
         if (desc.kinematic) actor.setRigidBodyFlag(PhysX.PxRigidBodyFlagEnum.eKINEMATIC, true);
-        actor.setAngularDamping(0.05);
-        actor.setLinearDamping(0.01);
+        actor.setAngularDamping(desc.angularDamping !== undefined ? desc.angularDamping : 0.05);
+        actor.setLinearDamping(desc.linearDamping !== undefined ? desc.linearDamping : 0.01);
         if (typeof actor.setMaxLinearVelocity === 'function') actor.setMaxLinearVelocity(80.0);
+
+        // DOF locks. planar2D = classic 2D-sprite motion: translate in the
+        // desktop plane (X/Z), rotate only around the depth axis (Y).
+        const lock = desc.lock || {};
+        if (desc.planar2D) {
+            lock.linY = true;
+            lock.angX = true;
+            lock.angZ = true;
+        }
+        if (!desc.kinematic && PhysX.PxRigidDynamicLockFlagEnum &&
+            typeof actor.setRigidDynamicLockFlag === 'function') {
+            const L = PhysX.PxRigidDynamicLockFlagEnum;
+            if (lock.linX) actor.setRigidDynamicLockFlag(L.eLOCK_LINEAR_X, true);
+            if (lock.linY) actor.setRigidDynamicLockFlag(L.eLOCK_LINEAR_Y, true);
+            if (lock.linZ) actor.setRigidDynamicLockFlag(L.eLOCK_LINEAR_Z, true);
+            if (lock.angX) actor.setRigidDynamicLockFlag(L.eLOCK_ANGULAR_X, true);
+            if (lock.angY) actor.setRigidDynamicLockFlag(L.eLOCK_ANGULAR_Y, true);
+            if (lock.angZ) actor.setRigidDynamicLockFlag(L.eLOCK_ANGULAR_Z, true);
+        }
         this.scene.addActor(actor);
         this.dynBodies.set(fqid, { actor, radius, kinematic: !!desc.kinematic });
     }
@@ -430,7 +456,8 @@ export class SimWorld {
             for (const geom of body.geoms) {
                 const shape = this.createGeomShape(geom, shapeFlags);
                 if (shape) {
-                    shape.setSimulationFilterData(new PhysX.PxFilterData(2, 5, 0, 0));
+                    // Avatar hits world(1) + buddy objects(4) + cursor(8).
+                    shape.setSimulationFilterData(new PhysX.PxFilterData(2, 13, 0, 0));
                     link.attachShape(shape);
                 }
             }

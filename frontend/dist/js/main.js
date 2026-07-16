@@ -202,12 +202,11 @@ async function mainLoop(timestamp) {
         stepsThisFrame++;
         physStepCount++;
 
+        // The kinematic cursor body tracks the mouse at full sim rate.
+        sim.moveTarget(interact.targetWorld(), DT);
+
         if (physStepCount >= POLICY_SUBSTEPS) {
             physStepCount = 0;
-
-            // Move the kinematic strike target to the cursor.
-            const tp = interact.targetWorld();
-            sim.moveTarget(tp, DT * POLICY_SUBSTEPS);
 
             try {
                 const root = sim.rootPose();

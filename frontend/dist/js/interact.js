@@ -5,7 +5,8 @@
 //   - right-click on the buddy: context menu
 //   - cursor position becomes the strike target the buddy chases
 
-const DRAG_STIFFNESS = 250;
+const DRAG_STIFFNESS = 900;     // spring accel per meter of stretch
+const DRAG_DAMPING = 45;        // velocity damping (~critical for k=900 is 60)
 const MIN_RADIUS_PX = 24;       // minimum css px halo around each link
 
 export class Interact {
@@ -175,10 +176,18 @@ export class Interact {
             dx *= s; dy *= s; dz *= s;
         }
 
+        // Damped spring: strong pull toward the cursor without slingshot
+        // oscillation (damping is below critical so throws keep energy).
+        let vx = 0, vy = 0, vz = 0;
+        try {
+            const v = this.dragBody.getLinearVelocity();
+            vx = v.get_x(); vy = v.get_y(); vz = v.get_z();
+        } catch (e) {}
+
         const force = new PhysX.PxVec3(
-            dx * mass * DRAG_STIFFNESS,
-            dy * mass * DRAG_STIFFNESS,
-            dz * mass * DRAG_STIFFNESS
+            (dx * DRAG_STIFFNESS - vx * DRAG_DAMPING) * mass,
+            (dy * DRAG_STIFFNESS - vy * DRAG_DAMPING) * mass,
+            (dz * DRAG_STIFFNESS - vz * DRAG_DAMPING) * mass
         );
         const point = new PhysX.PxVec3(p.get_x(), p.get_y(), p.get_z());
         try {

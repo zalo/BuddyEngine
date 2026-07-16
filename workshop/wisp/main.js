@@ -12,6 +12,8 @@ const ball = buddy.phys.spawn('ball', {
     mass: 0.5,
     restitution: 0.65,
     friction: 0.4,
+    planar2D: true,        // 2D-sprite motion: X/Z only, spin on depth axis only
+    angularDamping: 0.9,   // rolling contact can't wind up runaway spin
 });
 
 // Visuals: additive-blend shader glow on a camera-facing quad.

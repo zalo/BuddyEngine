@@ -80,8 +80,15 @@ const ball = buddy.phys.spawn('ball', {
   shape: {type:'sphere', r:0.14},           // box {hx,hy,hz} | capsule {r,hh} | sphere {r}
   pos: [2,0,1], quat: [0,0,0,1],
   mass: 0.5, friction: 0.4, restitution: 0.65,
+  angularDamping: 0.9, linearDamping: 0.01,
   kinematic: false,
   collides: 'all',                           // 'all' | 'world' (not other buddies) | 'none'
+  collidesCursor: false,                     // opt into the cursor-target collision layer
+                                             // (only the avatar hits it by default)
+  planar2D: true,                            // 2D-sprite motion: locks linear Y + angular X/Z,
+                                             // so it moves in the desktop plane and spins only
+                                             // around the depth axis
+  lock: {linX, linY, linZ, angX, angY, angZ} // or pick individual DOF locks
 });
 ball.force([fx,fy,fz], point?); ball.impulse(...); ball.velocity(v, w);
 ball.kinematicTarget(pos, quat);             // kinematic bodies sweep with velocity
