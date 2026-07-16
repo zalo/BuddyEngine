@@ -6,3 +6,8 @@ build/bin/
 node_modules/
 .DS_Store
 Thumbs.db
+
+# ROMs (bring your own — never commit)
+*.z64
+*.n64
+*.v64
