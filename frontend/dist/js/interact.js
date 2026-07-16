@@ -31,29 +31,6 @@ export class Interact {
         this.clickThrough = true; // overlay starts click-through
 
         this.onRightClick = null; // (cssX, cssY) => void
-
-        // Per-body hover radius (css px) from the collision geometry, so the
-        // whole limb is grabbable, not just the link origin.
-        this.linkRadiiPx = [];
-        const dpr = window.devicePixelRatio || 1;
-        for (const body of sim.data.bodies) {
-            let r = 0.06;
-            for (const g of body.geoms) {
-                const c = g.pos ? Math.hypot(g.pos[0], g.pos[1], g.pos[2]) : 0;
-                if (g.type === 'sphere') r = Math.max(r, c + g.radius);
-                else if (g.type === 'capsule' && g.fromto) {
-                    const ft = g.fromto;
-                    const l0 = Math.hypot(ft[0], ft[1], ft[2]);
-                    const l1 = Math.hypot(ft[3], ft[4], ft[5]);
-                    r = Math.max(r, Math.max(l0, l1) + g.radius);
-                } else if (g.type === 'box') {
-                    r = Math.max(r, c + Math.hypot(...g.halfExtents));
-                } else if (g.type === 'cylinder') {
-                    r = Math.max(r, c + (g.radius || 0.05) + (g.halfHeight || 0));
-                }
-            }
-            this.linkRadiiPx.push(Math.max(MIN_RADIUS_PX, r * desk.ppm / dpr * 0.9));
-        }
     }
 
     updateCursor(c) {
@@ -75,25 +52,16 @@ export class Interact {
     hitTest() {
         const dpr = window.devicePixelRatio || 1;
         const cx = this.cursor.x / dpr, cy = this.cursor.y / dpr;
+        // Everything grabbable: articulation links + buddy-API bodies.
         let best = null, bestScore = Infinity;
-        for (let i = 0; i < this.sim.links.length; i++) {
-            const pose = this.sim.links[i].link.getGlobalPose();
+        for (const t of this.sim.hoverTargets()) {
+            const pose = t.actor.getGlobalPose();
             const p = pose.get_p();
             const s = this.renderer.projectToScreen(p.get_x(), p.get_y(), p.get_z());
             const d = Math.hypot(s.x - cx, s.y - cy);
-            const score = d - (this.linkRadiiPx[i] || MIN_RADIUS_PX);
-            if (score < bestScore) { bestScore = score; best = { kind: 'link', index: i, actor: this.sim.links[i].link }; }
-        }
-        // Buddy-API bodies are grabbable/hoverable too.
-        const dpr2 = window.devicePixelRatio || 1;
-        for (const [fqid, b] of this.sim.dynBodies) {
-            const pose = b.actor.getGlobalPose();
-            const p = pose.get_p();
-            const s = this.renderer.projectToScreen(p.get_x(), p.get_y(), p.get_z());
-            const d = Math.hypot(s.x - cx, s.y - cy);
-            const rPx = Math.max(MIN_RADIUS_PX, b.radius * this.desk.ppm / dpr2);
+            const rPx = Math.max(MIN_RADIUS_PX, t.radius * this.desk.ppm / dpr * 0.9);
             const score = d - rPx;
-            if (score < bestScore) { bestScore = score; best = { kind: 'dyn', id: fqid, actor: b.actor }; }
+            if (score < bestScore) { bestScore = score; best = { id: t.id, actor: t.actor }; }
         }
         if (bestScore < 0) return best;
         return null;
@@ -108,9 +76,10 @@ export class Interact {
         const lEdgeUp = !this.cursor.l && this.prevL;
         const rEdgeDown = this.cursor.r && !this.prevR;
 
-        // Pointer enter/leave/down/up events for buddy-cell bodies.
+        // Pointer enter/leave/down/up events for buddy-cell bodies
+        // (articulation links included — their ids carry the owner prefix).
         if (this.cartMgr) {
-            const hoverId = hit && hit.kind === 'dyn' ? hit.id : null;
+            const hoverId = hit ? hit.id : null;
             const cw = this.cursorWorld();
             if (hoverId !== this.lastHoverId) {
                 if (this.lastHoverId) this.cartMgr.routePointerEvent(this.lastHoverId, 'pointerleave', cw.x, cw.z);

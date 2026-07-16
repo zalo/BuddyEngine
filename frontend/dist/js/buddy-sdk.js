@@ -26,6 +26,8 @@ const state = {
     ids: [],
     colliders: [],
     bodies: new Map(),
+    arti: {},
+    framePending: false,
 };
 
 function send(cmd) { state.cmds.push(cmd); }
@@ -54,6 +56,21 @@ class BodyHandle {
     velocity(v, w) { send({ op: 'phys.velocity', id: this.id, v, w }); }
     kinematicTarget(pos, quat) { send({ op: 'phys.kinematic', id: this.id, pos, quat }); }
     remove() { send({ op: 'phys.remove', id: this.id }); }
+}
+
+class ArticulationHandle {
+    constructor(id) { this.id = id; }
+    // Latest joint state (dofPos/dofVel arrays), refreshed every frame.
+    get state() { return state.arti[this.id] || null; }
+    // PD drive targets by dof index; call from onFrame — commands flush at
+    // the end of the callback and apply before the next physics step.
+    drive(targets) {
+        send({ op: 'arti.drive', id: this.id, targets: Array.from(targets) });
+    }
+    reset(x) { send({ op: 'arti.reset', id: this.id, x }); }
+    remove() { send({ op: 'arti.remove', id: this.id }); }
+    // World body id of one of this rig's links (for world.bodies / attach).
+    linkBody(linkName) { return this.id + '.' + linkName; }
 }
 
 class NodeHandle {
@@ -86,6 +103,12 @@ const buddy = {
     phys: {
         spawn(id, desc) { send({ op: 'phys.spawn', id, ...desc }); return new BodyHandle(id); },
         body(id) { return new BodyHandle(id); },
+        // Articulated rig from an engine-agnostic description (named links
+        // with geoms/mass, joints with axes/limits/PD drives, init pose).
+        articulation(id, data, spawn) {
+            send({ op: 'arti.create', id, data, spawn });
+            return new ArticulationHandle(id);
+        },
     },
 
     gfx: {
@@ -112,6 +135,26 @@ const buddy = {
         async wasm(path, imports = {}) {
             const bytes = await this.bytes(path);
             return WebAssembly.instantiate(bytes, imports);
+        },
+        // Import another (self-contained) JS module from the pack.
+        async module(path) {
+            const bytes = await this.bytes(path);
+            const url = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
+            return import(url);
+        },
+        // Run a classic (non-module) script, e.g. UMD bundles like
+        // onnxruntime-web, so its top-level vars land on globalThis.
+        // (eval won't do: strict-mode bundles keep their vars eval-scoped.)
+        async script(path) {
+            const bytes = await this.bytes(path);
+            const url = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
+            await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = url;
+                s.onload = res;
+                s.onerror = () => rej(new Error('script load failed: ' + path));
+                document.head.appendChild(s);
+            });
         },
     },
 
@@ -166,11 +209,13 @@ export function __init(protocolModule, init) {
     state.readyResolvers.length = 0;
 }
 
-function onFrame(msg) {
+async function onFrame(msg) {
+    if (state.framePending) return; // drop frames while an async callback runs
     const f = proto.getCodecs().frame.unpack(msg.bin);
     const meta = msg.meta || {};
     if (meta.ids) state.ids = meta.ids;
     if (meta.colliders) state.colliders = meta.colliders;
+    if (meta.arti) state.arti = meta.arti;
 
     // Decode body states into a Map view.
     state.bodies.clear();
@@ -193,15 +238,24 @@ function onFrame(msg) {
 
     if (state.frameCb) {
         try {
-            state.frameCb({
+            // Async callbacks (e.g. ONNX inference) are awaited so drive
+            // commands computed from THIS frame's observations flush in the
+            // same turn — the host applies them before its next sim step.
+            const r = state.frameCb({
                 time: f.time,
                 dt: f.dt,
                 cursor: f.cursor,
                 bodies: state.bodies,
                 colliders: state.colliders,
+                arti: state.arti,
                 events: meta.events || [],
             });
+            if (r && typeof r.then === 'function') {
+                state.framePending = true;
+                try { await r; } finally { state.framePending = false; }
+            }
         } catch (e) {
+            state.framePending = false;
             buddy.log('frame cb error: ' + (e.stack || e.message));
         }
     }

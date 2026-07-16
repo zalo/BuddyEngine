@@ -1,8 +1,9 @@
-// BuddyEngine frontend bootstrap + main loop.
+// BuddyEngine host bootstrap + main loop. The host is a pure engine:
+// PhysX world, desktop colliders, transparent renderer, input routing and
+// the Buddy API runtime. Characters (including the default swordfighter)
+// are workshop packs running in sandboxed cells.
 
-import { SimWorld, DT, POLICY_SUBSTEPS } from './sim.js';
-import { parseMJCF } from './mjcf.js';
-import { Policy, loadModelBuffers } from './policy.js';
+import { SimWorld, DT } from './sim.js';
 import { Renderer } from './render.js';
 import { Desk } from './desk.js';
 import { Interact } from './interact.js';
@@ -10,23 +11,13 @@ import { initProtocol } from './api/protocol.js';
 import { CartridgeManager } from './api/cartridges.js';
 import * as packcat from '../vendor/packcat.js';
 
-const IDLE_AFTER_S = 8;        // cursor idle -> ASE latent (idle animations)
-const IDLE_NEW_SKILL_S = 5;    // pick a new idle latent target every N sec
-const RESET_GRACE = 90;
-
-let sim, desk, renderer, interact, policy, cartMgr;
-let humanoidData = {};
+let sim, desk, renderer, interact, cartMgr;
 let running = false;
-let currentAction = null;
-let prevTargetPos = null;
-let resetGraceFrames = 60;
-let physStepCount = 0;
 let simAccum = 0;
 let lastSimTimestamp = 0;
-let lastIdleSkill = 0;
-let mode = 'strike';
-let iconColliders = false; // off by default; toggle in the buddy menu
+let iconColliders = false; // off by default; toggle in the buddy/tray menu
 let escapeCheck = 0;
+let frameCounter = 0;
 
 function setStatus(msg) {
     const el = document.getElementById('loadStatus');
@@ -53,79 +44,21 @@ async function boot() {
     setStatus('Connecting to backend...');
     const bootstrap = await window.go.main.App.GetBootstrap();
 
-    setStatus('Loading policy models...');
-    // Use the first workshop pack if present, else the built-in buddy.
-    const packs = bootstrap.packs || [];
-    const hasLLC = (p) => {
-        try {
-            const m = typeof p.manifest === 'string' ? JSON.parse(p.manifest) : p.manifest;
-            return m && m.llc;
-        } catch (e) { return false; }
-    };
-    const modelPack = packs.find(hasLLC) || null;
-    let buffers;
-    let manifest = null;
-    if (modelPack) {
-        try {
-            buffers = await loadModelBuffers(modelPack);
-            manifest = buffers.manifest;
-            console.log('Loaded workshop pack:', modelPack.name);
-        } catch (e) {
-            console.warn('Workshop pack failed, using built-in buddy:', e);
-            buffers = await loadModelBuffers(null);
-        }
-    } else {
-        buffers = await loadModelBuffers(null);
-    }
-
-    policy = new Policy();
     setStatus('Initializing PhysX...');
     sim = new SimWorld();
-    await Promise.all([sim.init(), policy.load(buffers)]);
-
-    const meta = policy.meta;
-    if (!meta) throw new Error('No mimickit_config metadata in LLC ONNX');
-    const fields = ['obs_dim','act_dim','latent_dim','obs_mean','obs_std','a_mean','a_std',
-                    'init_dof_pos','init_root_pos','init_root_rot_quat','action_low','action_high',
-                    'key_body_ids','global_obs','pelvis_z','tpose_pelvis_z'];
-    for (const f of fields) {
-        if (meta[f] !== undefined) humanoidData[f] = meta[f];
-    }
-    if (meta.mjcf_xml) {
-        Object.assign(humanoidData, parseMJCF(meta.mjcf_xml));
-    }
-    if (!humanoidData.bodies) throw new Error('No character data in ONNX metadata');
-
-    // Fix up spherical joint axis maps (matches the reference demo).
-    if (humanoidData.kinematicJoints) {
-        for (const kj of humanoidData.kinematicJoints) {
-            if (kj.type !== 'SPHERICAL') continue;
-            for (let d = 0; d < 3; d++)
-                humanoidData.dofInfo[kj.dof_idx + d].physx_axis = d;
-        }
-        for (const jdata of humanoidData.joints) {
-            if (jdata.jointType === 'spherical' && jdata.axisMap)
-                jdata.axisMap = [0, 1, 2];
-        }
-    }
+    await sim.init();
 
     setStatus('Building world...');
-    const ppm = (manifest && manifest.pixelsPerMeter) || 140;
     desk = new Desk(sim, {
         screenW: bootstrap.screenW,
         screenH: bootstrap.screenH,
         workBottom: bootstrap.workBottom,
-        ppm,
+        ppm: 140,
     });
     desk.createStaticEnvironment();
     sim.createTarget();
 
-    // Spawn slightly left of center, on the ground.
-    sim.buildArticulation(humanoidData, { x: -1.5 });
-
     renderer = new Renderer(desk);
-    renderer.buildBodyMeshes(sim.links, humanoidData.bodies);
-
     interact = new Interact(sim, desk, renderer);
     setupMenu();
 
@@ -133,16 +66,25 @@ async function boot() {
     initProtocol(packcat);
     cartMgr = new CartridgeManager(sim, desk, renderer, (msg) => {
         console.log('[buddy-api]', msg);
-        try { window.go.main.App.LogError('[buddy-api] ' + msg); } catch (e) {}
+        logToBackend('[buddy-api] ' + msg);
     });
     interact.cartMgr = cartMgr;
+
+    const packs = bootstrap.packs || [];
+    let spawned = 0;
     for (const p of packs) {
         try {
             const m = typeof p.manifest === 'string' ? JSON.parse(p.manifest) : p.manifest;
-            if (m && m.main) cartMgr.spawn(p, m);
+            if (m && m.main) {
+                cartMgr.spawn(p, m);
+                spawned++;
+            }
         } catch (e) {
             console.warn('pack manifest error:', p.name, e);
         }
+    }
+    if (spawned === 0) {
+        logToBackend('no runnable packs found — drop packs into the workshop folder');
     }
 
     // Backend event streams.
@@ -151,7 +93,6 @@ async function boot() {
         desk.updateWindows(d.windows || []);
         const icons = d.icons || [];
         desk.updateIcons(iconColliders ? icons : []);
-        // With icon collision off, still show icon rects in the debug view.
         renderer.setGhostBoxes(iconColliders ? [] : icons.map(r => desk.rectToBox(r)));
     });
 
@@ -159,19 +100,10 @@ async function boot() {
     running = true;
     lastSimTimestamp = performance.now();
     requestAnimationFrame(mainLoop);
-    console.log('BuddyEngine running');
+    console.log('BuddyEngine host running,', spawned, 'buddy cell(s) spawning');
 }
 
-function resetBuddy() {
-    renderer.removeBodyMeshes(sim.links);
-    sim.removeArticulation();
-    sim.buildArticulation(humanoidData, { x: 0 });
-    renderer.buildBodyMeshes(sim.links, humanoidData.bodies);
-    currentAction = null;
-    resetGraceFrames = RESET_GRACE;
-}
-
-async function mainLoop(timestamp) {
+function mainLoop(timestamp) {
     if (!running) return;
 
     const realDT = Math.min((timestamp - lastSimTimestamp) / 1000, 0.1);
@@ -179,20 +111,6 @@ async function mainLoop(timestamp) {
     simAccum += realDT;
 
     interact.update();
-
-    // Behavior mode: strike at the mouse; drift into idle skills when the
-    // cursor hasn't moved in a while.
-    const idle = interact.idleSeconds();
-    if (idle > IDLE_AFTER_S) {
-        if (mode !== 'idle') { mode = 'idle'; policy.randomLatent(); }
-        if (timestamp - lastIdleSkill > IDLE_NEW_SKILL_S * 1000) {
-            policy.newLatentTarget();
-            lastIdleSkill = timestamp;
-        }
-    } else if (mode !== 'strike') {
-        mode = 'strike';
-    }
-
     if (cartMgr) cartMgr.applyPendingPhysics();
 
     const maxSubstepsPerFrame = 8;
@@ -200,51 +118,23 @@ async function mainLoop(timestamp) {
     while (simAccum >= DT && stepsThisFrame < maxSubstepsPerFrame) {
         simAccum -= DT;
         stepsThisFrame++;
-        physStepCount++;
 
         // The kinematic cursor body tracks the mouse at full sim rate.
         sim.moveTarget(interact.targetWorld(), DT);
-
-        if (physStepCount >= POLICY_SUBSTEPS) {
-            physStepCount = 0;
-
-            try {
-                const root = sim.rootPose();
-                const supportZ = sim.supportHeightAt(root.pos[0], root.pos[2]);
-                const obs = sim.buildObservation(supportZ);
-                if (mode === 'strike') {
-                    const taskObs = sim.buildTaskObs(supportZ);
-                    currentAction = await policy.runStrike(obs, taskObs, humanoidData.obs_dim);
-                } else {
-                    policy.slerpLatent();
-                    currentAction = await policy.runLatent(obs, humanoidData.obs_dim);
-                }
-                if (currentAction) sim.applyActions(currentAction);
-            } catch (e) {
-                console.error('Policy error:', e.message);
-            }
-        }
 
         interact.applyDragForce();
         sim.updateKinematics(DT); // sweep window/icon colliders with velocity
         sim.step();
     }
 
-    // Auto-reset if the sim explodes or the buddy leaves the play volume,
-    // and rescue any stray Buddy-API bodies (wisp & co).
-    try {
-        const halfW = desk.screenW / 2 / desk.ppm;
-        const root = sim.rootPose();
-        const rz = root.pos[2], rx = root.pos[0], ry = root.pos[1];
-        if (resetGraceFrames > 0) resetGraceFrames--;
-        else if (!isFinite(rz) || rz < -3 || rz > 90 || Math.abs(ry) > 6 ||
-                 Math.abs(rx) > halfW + 3) {
-            resetBuddy();
-        }
-        if (escapeCheck++ % 30 === 0) sim.rescueStrayBodies(halfW);
-    } catch (e) {}
+    // Escape net for articulations and buddy bodies.
+    if (escapeCheck++ % 30 === 0) {
+        try {
+            const rescued = sim.rescueStrays(desk.screenW / 2 / desk.ppm);
+            if (rescued > 0) console.log('rescued', rescued, 'stray bodies');
+        } catch (e) {}
+    }
 
-    renderer.updateMeshes(sim.links);
     if (cartMgr) {
         cartMgr.updateMirrors();
         const cw = interact.cursorWorld();
@@ -259,10 +149,9 @@ async function mainLoop(timestamp) {
     renderer.render();
     requestAnimationFrame(mainLoop);
 }
-let frameCounter = 0;
 
 // ---------------------------------------------------------------------------
-// Context menu (right-click on the buddy)
+// Context menu (right-click on a buddy) + tray commands
 // ---------------------------------------------------------------------------
 function setupMenu() {
     const menu = document.getElementById('menu');
@@ -280,8 +169,10 @@ function setupMenu() {
         interact.menuOpen = false;
     };
 
+    const resetBuddies = () => { if (cartMgr) cartMgr.resetArticulations(); };
+
     document.getElementById('menu-reset').addEventListener('click', () => {
-        resetBuddy();
+        resetBuddies();
         closeMenu();
     });
     const iconsBtn = document.getElementById('menu-icons');
@@ -299,26 +190,24 @@ function setupMenu() {
     };
     debugBtn.addEventListener('click', () => { toggleDebug(); closeMenu(); });
 
-    // Tray menu commands from the backend.
     window.runtime.EventsOn('tray', (id) => {
-        if (id === 'reset') resetBuddy();
+        if (id === 'reset') resetBuddies();
         else if (id === 'debug') toggleDebug();
         else if (id === 'icons') toggleIconColliders();
     });
-    document.getElementById('menu-quit').addEventListener('click', () => {
-        window.go.main.App.Quit();
-    });
+
     document.getElementById('menu-packs').addEventListener('click', async () => {
         const packs = await window.go.main.App.RefreshPacks();
-        console.log('Workshop packs:', packs);
         alert(packs.length
             ? 'Workshop packs:\n' + packs.map(p => `- ${p.name} (${p.source})`).join('\n')
             : 'No workshop packs installed.\nDrop packs into the "workshop" folder next to BuddyEngine.exe or subscribe on Steam.');
         closeMenu();
     });
+    document.getElementById('menu-quit').addEventListener('click', () => {
+        window.go.main.App.Quit();
+    });
     document.getElementById('menu-close').addEventListener('click', closeMenu);
 
-    // Clicking anywhere else closes the menu.
     document.addEventListener('mousedown', (e) => {
         if (interact.menuOpen && !menu.contains(e.target)) closeMenu();
     });
@@ -326,5 +215,6 @@ function setupMenu() {
 
 boot().catch(err => {
     setStatus('Error: ' + err.message);
+    logToBackend('boot error: ' + (err.stack || err.message));
     console.error(err);
 });

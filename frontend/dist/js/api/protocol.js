@@ -69,6 +69,13 @@ export const OPS = {
     PHYS_VELOCITY: 'phys.velocity', // {id, v?:[3], w?:[3]}
     PHYS_KINEMATIC: 'phys.kinematic', // {id, pos:[3], quat?:[4]}
 
+    // articulated rigs (engine-agnostic: MJCF humanoids, mecanim chains,
+    // GLTF skeleton proxies all lower to the same description)
+    ARTI_CREATE: 'arti.create',     // {id, data:{bodies,joints,fixedJoints,dofInfo,init_*}, spawn?:{x,z}}
+    ARTI_DRIVE: 'arti.drive',       // {id, targets:[dof PD targets]} — applied before the next sim step
+    ARTI_RESET: 'arti.reset',       // {id, x?}
+    ARTI_REMOVE: 'arti.remove',     // {id}
+
     // retained-mode scene graph (three.js semantics)
     GEO_DEFINE: 'geo.define',       // {id, type:'box'|'sphere'|'capsule'|'plane'|'cylinder', params} | {id, type:'buffer', position:F32, normal?:F32, uv?:F32, index?:U32}
     MAT_DEFINE: 'mat.define',       // {id, type:'standard'|'basic'|'shader'|'sprite', params?, map?:texId, vertexShader?, fragmentShader?, uniforms?, transparent?, blending?}

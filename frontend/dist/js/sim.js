@@ -1,14 +1,17 @@
-// PhysX world + humanoid articulation, ported from the SwordBrawl MimicKit
-// strike demo. World is Z-up, meters. The desktop plane is X (screen right)
-// by Z (screen up); Y is depth (out of the monitor).
+// PhysX world owned by the host. World is Z-up, meters; the desktop plane is
+// X (screen right) by Z (screen up); Y is depth (out of the monitor).
+//
+// The host knows nothing about any particular character: articulated bodies
+// are created generically through the Buddy API (arti.* commands) from rig
+// descriptions supplied by buddy cells. Policies, observations and skinning
+// live in the cells.
+//
+// Collision groups (filter word0): 1=world statics, 2=articulations,
+// 4=buddy-API bodies, 8=cursor target. word1 = which groups I hit.
 
-import {
-    quatRotateVec, quatMul, axisAngleToQuat, expMapToQuat,
-    calcHeadingQuatInv, quatToTanNorm, quatFromTwoVec,
-} from './math3d.js';
+import { quatFromTwoVec } from './math3d.js';
 
 export const DT = 1 / 120;
-export const POLICY_SUBSTEPS = 4; // control at 30Hz
 
 export class SimWorld {
     constructor() {
@@ -16,14 +19,11 @@ export class SimWorld {
         this.physics = null;
         this.scene = null;
         this.material = null;
-        this.articulation = null;
-        this.links = [];          // { name, link, meshGroup }
-        this.data = null;         // humanoidData
-        this.origDrives = [];
-        this.staticActors = new Map(); // key -> { actor, rect }
-        this.targetActor = null;  // kinematic mouse target
-        this.targetState = { pos: [2,0,0.9], vel: [0,0,0] };
-        this.dynBodies = new Map(); // fqid -> { actor, radius, kinematic } (Buddy API bodies)
+        this.staticActors = new Map();  // colliders (ground/walls/windows/icons)
+        this.dynBodies = new Map();     // fqid -> { actor, radius, kinematic }
+        this.articulations = new Map(); // fq prefix -> articulation record
+        this.targetActor = null;        // kinematic cursor target
+        this.targetState = { pos: [2, 0, 0.9], vel: [0, 0, 0] };
         this.enums = {};
     }
 
@@ -82,7 +82,6 @@ export class SimWorld {
 
     // -- static colliders (ground, screen walls, windows, icons) ------------
 
-    // Filter data: statics act like ground (group 1, collides with 2|4).
     addStaticBox(key, cx, cy, cz, hx, hy, hz) {
         const PhysX = this.PhysX;
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
@@ -98,9 +97,6 @@ export class SimWorld {
         return actor;
     }
 
-    // Kinematic collider for things that move (windows, icons). Driven via
-    // setKinematicTarget so PhysX derives a proper velocity for contacts —
-    // dragging a window shoves the buddy instead of teleporting through it.
     addKinematicBox(key, cx, cy, cz, hx, hy, hz) {
         const PhysX = this.PhysX;
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
@@ -122,9 +118,6 @@ export class SimWorld {
         return actor;
     }
 
-    // New desired position; updateKinematics() sweeps the actor there with
-    // velocity. Jumps larger than teleportDist (snap/maximize, occlusion
-    // reshuffles) teleport instead so they can't plow through the buddy.
     setKinematicGoal(key, cx, cz, teleportDist = 3.0) {
         const entry = this.staticActors.get(key);
         if (!entry || !entry.kinematic) return;
@@ -136,7 +129,6 @@ export class SimWorld {
         entry.goal.cz = cz;
     }
 
-    // Instant relocation without contact velocity (no shove).
     setKinematicPose(key, cx, cz) {
         const entry = this.staticActors.get(key);
         if (!entry || !entry.kinematic) return;
@@ -146,15 +138,13 @@ export class SimWorld {
         entry.goal.cx = cx;
         entry.goal.cz = cz;
         entry.actor.setGlobalPose(new PhysX.PxTransform(
-            new PhysX.PxVec3(cx, entry.box.cy, entry.box.cz),
+            new PhysX.PxVec3(cx, entry.box.cy, cz),
             new PhysX.PxQuat(0, 0, 0, 1)), true);
     }
 
-    // Called every physics substep: move kinematic colliders smoothly toward
-    // their goals so window drags become continuous sweeps with velocity.
     updateKinematics(dt) {
         const PhysX = this.PhysX;
-        const tau = 0.08; // smoothing time constant, seconds
+        const tau = 0.08;
         const k = 1 - Math.exp(-dt / tau);
         for (const entry of this.staticActors.values()) {
             if (!entry.kinematic) continue;
@@ -179,11 +169,8 @@ export class SimWorld {
         }
     }
 
-    // Highest static surface top under (x) that is at or below z, used to
-    // make observations height-relative so standing on windows stays in
-    // distribution for the policy.
     supportHeightAt(x, z) {
-        let best = 0; // ground
+        let best = 0;
         for (const { box } of this.staticActors.values()) {
             if (box.wall) continue;
             const top = box.cz + box.hz;
@@ -194,16 +181,14 @@ export class SimWorld {
         return best;
     }
 
-    // -- mouse target (kinematic box the HLC tries to strike) ---------------
+    // -- cursor target (kinematic body on its own collision layer) ----------
 
-    // Collision groups (filter word0): 1=world statics, 2=avatar,
-    // 4=buddy-API objects, 8=cursor target. word1 = which groups I hit.
     createTarget() {
         const PhysX = this.PhysX;
         const shapeFlags = new PhysX.PxShapeFlags(this.enums.SHAPE_FLAGS);
         const geom = new PhysX.PxBoxGeometry(0.12, 0.12, 0.12);
         const shape = this.physics.createShape(geom, this.material, true, shapeFlags);
-        // Cursor layer: only the avatar collides with it (sword feedback);
+        // Cursor layer: articulations collide with it (sword feedback);
         // buddy objects ignore it unless they opt in via collidesCursor.
         shape.setSimulationFilterData(new PhysX.PxFilterData(8, 2, 0, 0));
         const pose = new PhysX.PxTransform(
@@ -218,8 +203,6 @@ export class SimWorld {
         if (!this.targetActor) return;
         const prev = this.targetState.pos;
         if (dt > 0) {
-            // Smooth the finite-difference velocity: at 120Hz a single-pixel
-            // cursor step reads as a large instantaneous spike.
             const maxV = 30;
             const alpha = 0.25;
             for (let i = 0; i < 3; i++) {
@@ -236,8 +219,6 @@ export class SimWorld {
 
     // -- generic dynamic bodies (Buddy API) ----------------------------------
 
-    // desc: {shape:{type,hx,hy,hz|r|hh}, pos, quat?, mass?, kinematic?,
-    //        collides?:'all'|'world'|'none', friction?, restitution?}
     spawnBody(fqid, desc) {
         const PhysX = this.PhysX;
         if (this.dynBodies.has(fqid)) this.removeBody(fqid);
@@ -266,7 +247,7 @@ export class SimWorld {
         const shape = this.physics.createShape(geom, mat, true, shapeFlags);
         const filters = { all: [4, 7], world: [4, 3], none: [4, 0] };
         const f = (filters[desc.collides || 'all'] || filters.all).slice();
-        if (desc.collidesCursor) f[1] |= 8; // opt into the cursor layer
+        if (desc.collidesCursor) f[1] |= 8;
         shape.setSimulationFilterData(new PhysX.PxFilterData(f[0], f[1], 0, 0));
 
         const p = desc.pos || [0, 0, 1];
@@ -281,8 +262,6 @@ export class SimWorld {
         actor.setLinearDamping(desc.linearDamping !== undefined ? desc.linearDamping : 0.01);
         if (typeof actor.setMaxLinearVelocity === 'function') actor.setMaxLinearVelocity(80.0);
 
-        // DOF locks. planar2D = classic 2D-sprite motion: translate in the
-        // desktop plane (X/Z), rotate only around the depth axis (Y).
         const lock = desc.lock || {};
         if (desc.planar2D) {
             lock.linY = true;
@@ -346,105 +325,36 @@ export class SimWorld {
             new PhysX.PxQuat(q[0], q[1], q[2], q[3])));
     }
 
-    // Snapshot every dynamic body in the world for the Buddy API frame
-    // packet: articulation links (sys/avatar/*), the strike target, and all
-    // buddy-spawned bodies. Layout: [pos3 quat4 linvel3 angvel3] per body.
-    snapshotBodies() {
-        const ids = [];
-        const entries = [];
-        for (const l of this.links) {
-            ids.push('sys/avatar/' + l.name);
-            entries.push(l.link);
-        }
-        if (this.targetActor) {
-            ids.push('sys/target');
-            entries.push(this.targetActor);
-        }
-        for (const [fqid, b] of this.dynBodies) {
-            ids.push(fqid);
-            entries.push(b.actor);
-        }
-        const buf = new Float32Array(entries.length * 13);
-        for (let i = 0; i < entries.length; i++) {
-            const a = entries[i];
-            const o = i * 13;
-            const pose = a.getGlobalPose();
-            const p = pose.get_p(), q = pose.get_q();
-            buf[o] = p.get_x(); buf[o+1] = p.get_y(); buf[o+2] = p.get_z();
-            buf[o+3] = q.get_x(); buf[o+4] = q.get_y(); buf[o+5] = q.get_z(); buf[o+6] = q.get_w();
-            try {
-                const v = a.getLinearVelocity(), w = a.getAngularVelocity();
-                buf[o+7] = v.get_x(); buf[o+8] = v.get_y(); buf[o+9] = v.get_z();
-                buf[o+10] = w.get_x(); buf[o+11] = w.get_y(); buf[o+12] = w.get_z();
-            } catch (e) {}
-        }
-        return { ids, buf };
-    }
+    // -- articulations (Buddy API rigs) ---------------------------------------
+    //
+    // A rig description is engine-agnostic data: named links with collision
+    // geoms/mass/inertia, joints with axes/limits/PD drive params, and an
+    // init pose. MimicKit MJCF humanoids, mecanim-style bone chains and GLTF
+    // skeleton proxies all lower to this same structure. Link world states
+    // stream back in body snapshots as `<prefix>.<linkName>`; joint states
+    // (dofPos/dofVel) stream to the owning cell each frame; drive targets
+    // arrive via arti.drive.
 
-    // Escape net: teleport any Buddy-API body that leaves the play volume
-    // back above the ground with zeroed velocity. Returns rescued count.
-    rescueStrayBodies(halfW) {
-        const PhysX = this.PhysX;
-        let rescued = 0;
-        for (const [fqid, b] of this.dynBodies) {
-            if (b.kinematic) continue;
-            const p = b.actor.getGlobalPose().get_p();
-            const x = p.get_x(), y = p.get_y(), z = p.get_z();
-            if (isFinite(x) && isFinite(y) && isFinite(z) &&
-                Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
-                continue;
-            }
-            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, isFinite(x) ? x : 0));
-            b.actor.setGlobalPose(new PhysX.PxTransform(
-                new PhysX.PxVec3(nx, 0, 2.0), new PhysX.PxQuat(0, 0, 0, 1)), true);
-            b.actor.setLinearVelocity(new PhysX.PxVec3(0, 0, 0));
-            b.actor.setAngularVelocity(new PhysX.PxVec3(0, 0, 0));
-            rescued++;
-        }
-        return rescued;
-    }
-
-    bodyPose(fqid) {
-        let actor = null;
-        if (fqid.startsWith('sys/avatar/')) {
-            const name = fqid.slice('sys/avatar/'.length);
-            const l = this.links.find(x => x.name === name);
-            actor = l && l.link;
-        } else if (fqid === 'sys/target') {
-            actor = this.targetActor;
-        } else {
-            const b = this.dynBodies.get(fqid);
-            actor = b && b.actor;
-        }
-        if (!actor) return null;
-        const pose = actor.getGlobalPose();
-        const p = pose.get_p(), q = pose.get_q();
-        return { pos: [p.get_x(), p.get_y(), p.get_z()], quat: [q.get_x(), q.get_y(), q.get_z(), q.get_w()] };
-    }
-
-    // -- articulation --------------------------------------------------------
-
-    buildArticulation(humanoidData, spawn) {
+    createArticulation(fq, data, spawn) {
         const PhysX = this.PhysX;
         const E = this.enums;
-        this.data = humanoidData;
+        if (this.articulations.has(fq)) this.removeArticulation(fq);
 
         const shapeFlags = new PhysX.PxShapeFlags(E.SHAPE_FLAGS);
         const rbext = PhysX.PxRigidBodyExt.prototype;
 
         const articulation = this.physics.createArticulationReducedCoordinate();
-        this.articulation = articulation;
         articulation.setSolverIterationCounts(4, 0);
         if (typeof articulation.setSleepThreshold === 'function') articulation.setSleepThreshold(5e-5);
         if (typeof articulation.setStabilizationThreshold === 'function') articulation.setStabilizationThreshold(1e-5);
         articulation.setArticulationFlag(PhysX.PxArticulationFlagEnum.eDISABLE_SELF_COLLISION, true);
 
         const bodyLinkMap = {};
-        this.links = [];
+        const links = [];
 
-        for (const body of humanoidData.bodies) {
+        for (const body of data.bodies) {
             const wp = body.pos;
-            const zOff = humanoidData.tpose_pelvis_z || humanoidData.pelvis_z;
+            const zOff = data.tpose_pelvis_z || data.pelvis_z || 0;
             const pose = new PhysX.PxTransform(
                 new PhysX.PxVec3(wp[0], wp[1], wp[2] + zOff),
                 new PhysX.PxQuat(0, 0, 0, 1)
@@ -453,13 +363,15 @@ export class SimWorld {
             const parentLink = body.parent ? bodyLinkMap[body.parent] : null;
             const link = articulation.createLink(parentLink, pose);
 
+            let radius = 0.06;
             for (const geom of body.geoms) {
                 const shape = this.createGeomShape(geom, shapeFlags);
                 if (shape) {
-                    // Avatar hits world(1) + buddy objects(4) + cursor(8).
+                    // Articulations hit world(1) + buddy objects(4) + cursor(8).
                     shape.setSimulationFilterData(new PhysX.PxFilterData(2, 13, 0, 0));
                     link.attachShape(shape);
                 }
+                radius = Math.max(radius, geomBoundRadius(geom));
             }
 
             if (body.mass && body.inertia && body.com) {
@@ -478,24 +390,22 @@ export class SimWorld {
             link.setAngularDamping(0.01);
             link.setLinearDamping(0.0);
             link.setMaxDepenetrationVelocity(10.0);
-            link.setMaxLinearVelocity(80.0);   // below tunneling speed for the containment walls
+            link.setMaxLinearVelocity(80.0);
             link.setMaxAngularVelocity(1000.0);
             if (typeof link.setSleepThreshold === 'function') link.setSleepThreshold(5e-5);
             if (typeof link.setStabilizationThreshold === 'function') link.setStabilizationThreshold(1e-5);
             if (typeof link.setCfmScale === 'function') link.setCfmScale(0.025);
             if (typeof link.setRigidBodyFlag === 'function') {
-                try { link.setRigidBodyFlag(PhysX.PxRigidBodyFlagEnum.eENABLE_GYROSCOPIC_FORCES, true); } catch(e) {}
+                try { link.setRigidBodyFlag(PhysX.PxRigidBodyFlagEnum.eENABLE_GYROSCOPIC_FORCES, true); } catch (e) {}
             }
 
             bodyLinkMap[body.name] = link;
-            this.links.push({ name: body.name, link, meshGroup: null });
+            links.push({ name: body.name, link, radius });
         }
 
-        // Joints
         const axisEnums = [E.TWIST, E.SWING1, E.SWING2];
-        this.origDrives.length = 0;
 
-        for (const jdata of humanoidData.joints) {
+        for (const jdata of data.joints) {
             const childLink = bodyLinkMap[jdata.child_body];
             const joint = childLink.getInboundJoint();
 
@@ -521,7 +431,6 @@ export class SimWorld {
                     joint.setDriveParams(axE, new PhysX.PxArticulationDrive(
                         ax.stiffness, ax.damping, ax.maxForce, E.FORCE));
                     if (ax.armature !== undefined) joint.setArmature(axE, ax.armature);
-                    this.origDrives.push({ joint, axisEnum: axE, stiffness: ax.stiffness, damping: ax.damping, maxForce: ax.maxForce });
                 }
                 for (let i = jdata.axes.length; i < 3; i++) {
                     joint.setMotion(axisEnums[i], E.LOCKED);
@@ -533,13 +442,12 @@ export class SimWorld {
                 joint.setDriveParams(E.TWIST, new PhysX.PxArticulationDrive(
                     ax.stiffness, ax.damping, ax.maxForce, E.FORCE));
                 if (ax.armature !== undefined) joint.setArmature(E.TWIST, ax.armature);
-                this.origDrives.push({ joint, axisEnum: E.TWIST, stiffness: ax.stiffness, damping: ax.damping, maxForce: ax.maxForce });
                 joint.setMotion(E.SWING1, E.LOCKED);
                 joint.setMotion(E.SWING2, E.LOCKED);
             }
         }
 
-        for (const fj of humanoidData.fixedJoints) {
+        for (const fj of data.fixedJoints || []) {
             const childLink = bodyLinkMap[fj.child_body];
             const joint = childLink.getInboundJoint();
             joint.setJointType(E.FIX);
@@ -551,8 +459,106 @@ export class SimWorld {
         }
 
         this.scene.addArticulation(articulation);
-        this.applyInitPose(spawn);
+
+        // Resolve per-dof joint handles once for fast drive/state access.
+        const dofAxes = (data.dofInfo || []).map(dof => ({
+            joint: bodyLinkMap[dof.child_body] ? bodyLinkMap[dof.child_body].getInboundJoint() : null,
+            axisEnum: axisEnums[dof.physx_axis],
+        }));
+
+        const rec = { fq, articulation, links, data, dofAxes, bodyLinkMap };
+        this.articulations.set(fq, rec);
+        this.applyArticulationInit(fq, spawn);
+        return rec;
     }
+
+    applyArticulationInit(fq, spawn) {
+        const PhysX = this.PhysX;
+        const E = this.enums;
+        const rec = this.articulations.get(fq);
+        if (!rec) return;
+        const data = rec.data;
+        if (!data.init_root_pos || !data.init_dof_pos) return;
+
+        const rp = data.init_root_pos.slice();
+        if (spawn) {
+            if (spawn.x !== undefined) rp[0] = spawn.x;
+            rp[1] = 0;
+            if (spawn.z !== undefined) rp[2] += spawn.z;
+        }
+        const rq = data.init_root_rot_quat || [0, 0, 0, 1];
+        const initDof = data.init_dof_pos;
+
+        rec.articulation.setRootGlobalPose(new PhysX.PxTransform(
+            new PhysX.PxVec3(rp[0], rp[1], rp[2]),
+            new PhysX.PxQuat(rq[0], rq[1], rq[2], rq[3])), true);
+
+        for (let i = 0; i < rec.dofAxes.length; i++) {
+            const d = rec.dofAxes[i];
+            if (!d.joint) continue;
+            try {
+                d.joint.setJointPosition(d.axisEnum, initDof[i]);
+                d.joint.setJointVelocity(d.axisEnum, 0);
+            } catch (e) {}
+        }
+        const initFlags = new PhysX.PxArticulationCacheFlags(PhysX.PxArticulationCacheFlagEnum.eALL);
+        const initCache = rec.articulation.createCache();
+        rec.articulation.copyInternalStateToCache(initCache, initFlags);
+        rec.articulation.applyCache(initCache, initFlags, true);
+
+        for (let i = 0; i < rec.dofAxes.length; i++) {
+            const d = rec.dofAxes[i];
+            if (!d.joint) continue;
+            try { d.joint.setDriveTarget(d.axisEnum, initDof[i]); } catch (e) {}
+        }
+    }
+
+    setArticulationDriveTargets(fq, targets) {
+        const rec = this.articulations.get(fq);
+        if (!rec) return;
+        const n = Math.min(targets.length, rec.dofAxes.length);
+        for (let i = 0; i < n; i++) {
+            const d = rec.dofAxes[i];
+            if (!d.joint) continue;
+            const t = targets[i];
+            if (!isFinite(t)) continue;
+            try { d.joint.setDriveTarget(d.axisEnum, t); } catch (e) {}
+        }
+    }
+
+    articulationJointState(fq) {
+        const rec = this.articulations.get(fq);
+        if (!rec) return null;
+        const n = rec.dofAxes.length;
+        const dofPos = new Array(n).fill(0);
+        const dofVel = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+            const d = rec.dofAxes[i];
+            if (!d.joint) continue;
+            try {
+                dofPos[i] = d.joint.getJointPosition(d.axisEnum);
+                dofVel[i] = d.joint.getJointVelocity(d.axisEnum);
+            } catch (e) {}
+        }
+        return { dofPos, dofVel };
+    }
+
+    removeArticulation(fq) {
+        const rec = this.articulations.get(fq);
+        if (!rec) return;
+        this.scene.removeArticulation(rec.articulation);
+        this.articulations.delete(fq);
+    }
+
+    articulationRootPose(fq) {
+        const rec = this.articulations.get(fq);
+        if (!rec || !rec.links.length) return null;
+        const pose = rec.links[0].link.getGlobalPose();
+        const p = pose.get_p(), q = pose.get_q();
+        return { pos: [p.get_x(), p.get_y(), p.get_z()], quat: [q.get_x(), q.get_y(), q.get_z(), q.get_w()] };
+    }
+
+    // -- shared geometry construction ----------------------------------------
 
     createGeomShape(geom, shapeFlags) {
         const PhysX = this.PhysX;
@@ -637,213 +643,128 @@ export class SimWorld {
         return shape;
     }
 
-    // spawn: optional { x, z } world offset for the root.
-    applyInitPose(spawn) {
+    // -- world queries ---------------------------------------------------------
+
+    // All grab/hover candidates: articulation links + buddy bodies.
+    hoverTargets() {
+        const out = [];
+        for (const rec of this.articulations.values()) {
+            for (const l of rec.links) {
+                out.push({ id: rec.fq + '.' + l.name, actor: l.link, radius: l.radius });
+            }
+        }
+        for (const [fqid, b] of this.dynBodies) {
+            out.push({ id: fqid, actor: b.actor, radius: b.radius });
+        }
+        return out;
+    }
+
+    // Escape net for all articulations + dynamic bodies.
+    rescueStrays(halfW) {
         const PhysX = this.PhysX;
-        const E = this.enums;
-        const data = this.data;
-        if (!data.init_root_pos || !data.init_dof_pos) return;
+        let rescued = 0;
 
-        const rp = data.init_root_pos.slice();
-        if (spawn) {
-            rp[0] = spawn.x !== undefined ? spawn.x : rp[0];
-            rp[1] = 0;
-            if (spawn.z !== undefined) rp[2] += spawn.z;
+        for (const [fqid, b] of this.dynBodies) {
+            if (b.kinematic) continue;
+            const p = b.actor.getGlobalPose().get_p();
+            const x = p.get_x(), y = p.get_y(), z = p.get_z();
+            if (isFinite(x) && isFinite(y) && isFinite(z) &&
+                Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
+                continue;
+            }
+            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, isFinite(x) ? x : 0));
+            b.actor.setGlobalPose(new PhysX.PxTransform(
+                new PhysX.PxVec3(nx, 0, 2.0), new PhysX.PxQuat(0, 0, 0, 1)), true);
+            b.actor.setLinearVelocity(new PhysX.PxVec3(0, 0, 0));
+            b.actor.setAngularVelocity(new PhysX.PxVec3(0, 0, 0));
+            rescued++;
         }
-        const rq = data.init_root_rot_quat;
-        const initDof = data.init_dof_pos;
 
-        this.articulation.setRootGlobalPose(new PhysX.PxTransform(
-            new PhysX.PxVec3(rp[0], rp[1], rp[2]),
-            new PhysX.PxQuat(rq[0], rq[1], rq[2], rq[3])), true);
-
-        const axisEnums = [E.TWIST, E.SWING1, E.SWING2];
-        const bodyLinkMap = {};
-        for (const l of this.links) bodyLinkMap[l.name] = l.link;
-        for (let i = 0; i < data.dofInfo.length; i++) {
-            const dof = data.dofInfo[i];
-            const cl = bodyLinkMap[dof.child_body];
-            if (!cl) continue;
-            try {
-                cl.getInboundJoint().setJointPosition(axisEnums[dof.physx_axis], initDof[i]);
-                cl.getInboundJoint().setJointVelocity(axisEnums[dof.physx_axis], 0);
-            } catch(e) {}
+        for (const fq of this.articulations.keys()) {
+            const root = this.articulationRootPose(fq);
+            if (!root) continue;
+            const [x, y, z] = root.pos;
+            if (isFinite(x) && isFinite(y) && isFinite(z) &&
+                Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
+                continue;
+            }
+            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, isFinite(x) ? x : 0));
+            this.applyArticulationInit(fq, { x: nx });
+            rescued++;
         }
-        const initFlags = new PhysX.PxArticulationCacheFlags(PhysX.PxArticulationCacheFlagEnum.eALL);
-        const initCache = this.articulation.createCache();
-        this.articulation.copyInternalStateToCache(initCache, initFlags);
-        this.articulation.applyCache(initCache, initFlags, true);
-
-        for (let i = 0; i < data.dofInfo.length; i++) {
-            const dof = data.dofInfo[i];
-            const childLink = bodyLinkMap[dof.child_body];
-            if (!childLink) continue;
-            try {
-                childLink.getInboundJoint().setDriveTarget(axisEnums[dof.physx_axis], initDof[i]);
-            } catch(e) {}
-        }
+        return rescued;
     }
 
-    removeArticulation() {
-        if (this.articulation) {
-            this.scene.removeArticulation(this.articulation);
-            this.articulation = null;
-            this.links = [];
+    snapshotBodies() {
+        const ids = [];
+        const entries = [];
+        for (const rec of this.articulations.values()) {
+            for (const l of rec.links) {
+                ids.push(rec.fq + '.' + l.name);
+                entries.push(l.link);
+            }
         }
+        if (this.targetActor) {
+            ids.push('sys/target');
+            entries.push(this.targetActor);
+        }
+        for (const [fqid, b] of this.dynBodies) {
+            ids.push(fqid);
+            entries.push(b.actor);
+        }
+        const buf = new Float32Array(entries.length * 13);
+        for (let i = 0; i < entries.length; i++) {
+            const a = entries[i];
+            const o = i * 13;
+            const pose = a.getGlobalPose();
+            const p = pose.get_p(), q = pose.get_q();
+            buf[o] = p.get_x(); buf[o+1] = p.get_y(); buf[o+2] = p.get_z();
+            buf[o+3] = q.get_x(); buf[o+4] = q.get_y(); buf[o+5] = q.get_z(); buf[o+6] = q.get_w();
+            try {
+                const v = a.getLinearVelocity(), w = a.getAngularVelocity();
+                buf[o+7] = v.get_x(); buf[o+8] = v.get_y(); buf[o+9] = v.get_z();
+                buf[o+10] = w.get_x(); buf[o+11] = w.get_y(); buf[o+12] = w.get_z();
+            } catch (e) {}
+        }
+        return { ids, buf };
     }
 
-    rootPose() {
-        const pose = this.links[0].link.getGlobalPose();
+    bodyPose(fqid) {
+        let actor = null;
+        if (fqid === 'sys/target') {
+            actor = this.targetActor;
+        } else if (this.dynBodies.has(fqid)) {
+            actor = this.dynBodies.get(fqid).actor;
+        } else {
+            for (const rec of this.articulations.values()) {
+                if (fqid.startsWith(rec.fq + '.')) {
+                    const name = fqid.slice(rec.fq.length + 1);
+                    const l = rec.links.find(x => x.name === name);
+                    actor = l && l.link;
+                    break;
+                }
+            }
+        }
+        if (!actor) return null;
+        const pose = actor.getGlobalPose();
         const p = pose.get_p(), q = pose.get_q();
-        return {
-            pos: [p.get_x(), p.get_y(), p.get_z()],
-            rot: [q.get_x(), q.get_y(), q.get_z(), q.get_w()],
-        };
-    }
-
-    // -- observations --------------------------------------------------------
-
-    // supportZ shifts all absolute heights so the policy believes the surface
-    // it stands on is the ground it was trained on.
-    buildObservation(supportZ) {
-        const E = this.enums;
-        const data = this.data;
-        const obs = new Float32Array(data.obs_dim);
-        const axisEnums = [E.TWIST, E.SWING1, E.SWING2];
-
-        const bodyLinkMap = {};
-        for (const l of this.links) bodyLinkMap[l.name] = l.link;
-
-        const root = this.rootPose();
-        const rootPos = root.pos, rootRot = root.rot;
-
-        const rv = this.links[0].link.getLinearVelocity();
-        const rootVel = [rv.get_x(), rv.get_y(), rv.get_z()];
-        const raw = this.links[0].link.getAngularVelocity();
-        const rootAngVel = [raw.get_x(), raw.get_y(), raw.get_z()];
-
-        const headingInv = calcHeadingQuatInv(rootRot);
-
-        let idx = 0;
-        obs[idx++] = rootPos[2] - supportZ;
-
-        const localRootRot = quatMul(headingInv, rootRot);
-        const rootTanNorm = quatToTanNorm(localRootRot);
-        for (let i = 0; i < 6; i++) obs[idx++] = rootTanNorm[i];
-
-        const localVel = quatRotateVec(headingInv, rootVel);
-        obs[idx++] = localVel[0]; obs[idx++] = localVel[1]; obs[idx++] = localVel[2];
-        const localAngVel = quatRotateVec(headingInv, rootAngVel);
-        obs[idx++] = localAngVel[0]; obs[idx++] = localAngVel[1]; obs[idx++] = localAngVel[2];
-
-        const dofPositions = new Float32Array(data.dofInfo.length);
-        for (let i = 0; i < data.dofInfo.length; i++) {
-            const dof = data.dofInfo[i];
-            const childLink = bodyLinkMap[dof.child_body];
-            if (childLink) {
-                try {
-                    dofPositions[i] = childLink.getInboundJoint().getJointPosition(axisEnums[dof.physx_axis]);
-                } catch(e) { dofPositions[i] = 0; }
-            }
-        }
-
-        for (const kj of data.kinematicJoints) {
-            let quat;
-            if (kj.type === 'SPHERICAL') {
-                quat = expMapToQuat(dofPositions[kj.dof_idx], dofPositions[kj.dof_idx + 1], dofPositions[kj.dof_idx + 2]);
-            } else if (kj.type === 'HINGE') {
-                quat = axisAngleToQuat(kj.axis, dofPositions[kj.dof_idx]);
-            } else {
-                quat = [0, 0, 0, 1];
-            }
-            const tn = quatToTanNorm(quat);
-            for (let k = 0; k < 6; k++) obs[idx++] = tn[k];
-        }
-
-        for (const dof of data.dofInfo) {
-            try {
-                const childLink = bodyLinkMap[dof.child_body];
-                if (childLink) {
-                    obs[idx++] = childLink.getInboundJoint().getJointVelocity(axisEnums[dof.physx_axis]);
-                } else { obs[idx++] = 0; }
-            } catch(e) { obs[idx++] = 0; }
-        }
-
-        const keyIds = data.key_body_ids || [2, 5, 10, 13, 16, 6];
-        for (const bid of keyIds) {
-            const lp = this.links[bid].link.getGlobalPose().get_p();
-            const rel = [lp.get_x() - rootPos[0], lp.get_y() - rootPos[1], lp.get_z() - rootPos[2]];
-            const localRel = quatRotateVec(headingInv, rel);
-            obs[idx++] = localRel[0]; obs[idx++] = localRel[1]; obs[idx++] = localRel[2];
-        }
-
-        return obs;
-    }
-
-    // ASE Strike task obs (15): local_tar_pos(3) + local_tar_rot tan/norm(6) +
-    // local_tar_vel(3) + local_tar_ang_vel(3). Target = the mouse cursor.
-    buildTaskObs(supportZ) {
-        const taskObs = new Float32Array(15);
-        const root = this.rootPose();
-        const headingInv = calcHeadingQuatInv(root.rot);
-
-        const tarPos = this.targetState.pos;
-        const tarVel = this.targetState.vel;
-
-        let idx = 0;
-        // ASE uses absolute Z; make it support-relative AND clamp to the
-        // strike-reachable band the HLC was trained on (pillar height), so a
-        // cursor at the top of the screen reads as "high but reachable".
-        const relZ = Math.min(Math.max(tarPos[2] - supportZ, 0.2), 2.2);
-        const tarRel = [
-            tarPos[0] - root.pos[0],
-            tarPos[1] - root.pos[1],
-            relZ,
-        ];
-        const localTarPos = quatRotateVec(headingInv, tarRel);
-        taskObs[idx++] = localTarPos[0];
-        taskObs[idx++] = localTarPos[1];
-        taskObs[idx++] = localTarPos[2];
-
-        // Target rotation: identity in heading frame.
-        const tarTanNorm = quatToTanNorm(quatMul(headingInv, [0, 0, 0, 1]));
-        for (let i = 0; i < 6; i++) taskObs[idx++] = tarTanNorm[i];
-
-        const localTarVel = quatRotateVec(headingInv, tarVel);
-        taskObs[idx++] = localTarVel[0];
-        taskObs[idx++] = localTarVel[1];
-        taskObs[idx++] = localTarVel[2];
-
-        // Angular velocity: zero (cursor doesn't spin).
-        taskObs[idx++] = 0; taskObs[idx++] = 0; taskObs[idx++] = 0;
-
-        return taskObs;
-    }
-
-    applyActions(action) {
-        const E = this.enums;
-        const data = this.data;
-        const axisEnums = [E.TWIST, E.SWING1, E.SWING2];
-        const bodyLinkMap = {};
-        for (const l of this.links) bodyLinkMap[l.name] = l.link;
-
-        const aLow = data.action_low, aHigh = data.action_high;
-        for (let i = 0; i < data.dofInfo.length; i++) {
-            const dof = data.dofInfo[i];
-            const childLink = bodyLinkMap[dof.child_body];
-            if (!childLink) continue;
-            try {
-                const joint = childLink.getInboundJoint();
-                if (!joint) continue;
-                let a = action[i];
-                if (aLow && aHigh) a = Math.max(aLow[i], Math.min(aHigh[i], a));
-                joint.setDriveTarget(axisEnums[dof.physx_axis], a);
-            } catch(e) {}
-        }
+        return { pos: [p.get_x(), p.get_y(), p.get_z()], quat: [q.get_x(), q.get_y(), q.get_z(), q.get_w()] };
     }
 
     step() {
         this.scene.simulate(DT);
         this.scene.fetchResults(true);
     }
+}
+
+function geomBoundRadius(g) {
+    const c = g.pos ? Math.hypot(g.pos[0], g.pos[1], g.pos[2]) : 0;
+    if (g.type === 'sphere') return c + g.radius;
+    if (g.type === 'capsule' && g.fromto) {
+        const ft = g.fromto;
+        return Math.max(Math.hypot(ft[0], ft[1], ft[2]), Math.hypot(ft[3], ft[4], ft[5])) + g.radius;
+    }
+    if (g.type === 'box') return c + Math.hypot(...(g.halfExtents || [0.1, 0.1, 0.1]));
+    if (g.type === 'cylinder') return c + (g.radius || 0.05) + (g.halfHeight || 0);
+    return c + 0.08;
 }

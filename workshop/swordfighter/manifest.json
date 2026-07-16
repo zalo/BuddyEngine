@@ -1,0 +1,9 @@
+{
+  "name": "Swordfighter",
+  "author": "BuddyEngine",
+  "version": 2,
+  "main": "main.js",
+  "llc": "llc_sword_shield.onnx",
+  "hlc_strike": "hlc_strike.onnx",
+  "description": "MimicKit sword & shield humanoid: chases and strikes the mouse cursor, does idle skills when you leave it alone. ONNX policies run inside the pack's cell; the rig and meshes flow through the Buddy API."
+}

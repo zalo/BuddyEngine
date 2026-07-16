@@ -8,7 +8,7 @@ import { SceneMirror } from './scene-mirror.js';
 
 const HARNESS = `<!doctype html><html><head>
 <meta http-equiv="Content-Security-Policy"
- content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob: 'wasm-unsafe-eval'; worker-src blob:; img-src blob: data:;">
+ content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob: 'wasm-unsafe-eval'; worker-src blob:; img-src blob: data:; connect-src blob: data:;">
 </head><body><script>
 (function () {
   let booted = false;
@@ -48,6 +48,7 @@ class Cell {
         this.lastEpochSent = -1;
         this.lastCollidersJson = '';
         this.bodyIds = new Set(); // local ids of bodies this cell spawned
+        this.artiIds = new Set(); // local ids of articulations this cell spawned
         this.mirror = new SceneMirror(mgr.renderer.scene, (path) => mgr.readPackAsset(pack, path));
         this.iframe = null;
     }
@@ -85,6 +86,8 @@ class Cell {
         this.mgr.log(`cell ${this.id} (${this.manifest.name}) killed: ${reason}`);
         for (const local of this.bodyIds) this.mgr.sim.removeBody(this.fq(local));
         this.bodyIds.clear();
+        for (const local of this.artiIds) this.mgr.sim.removeArticulation(this.fq(local));
+        this.artiIds.clear();
         this.mirror.disposeAll();
         if (this.iframe) this.iframe.remove();
         this.mgr.cells.delete(this.id);
@@ -137,6 +140,17 @@ export class CartridgeManager {
     }
 
     async readPackAsset(pack, path) {
+        // 'sys:' prefix = host-provided shared runtime assets (whitelisted),
+        // so packs don't have to bundle onnxruntime/three-scale payloads.
+        if (path.startsWith('sys:')) {
+            const sub = path.slice(4).replace(/^\/+/, '');
+            if (!sub.startsWith('vendor/') && !sub.startsWith('assets/')) {
+                throw new Error('sys asset not allowed: ' + sub);
+            }
+            const resp = await fetch('./' + sub);
+            if (!resp.ok) throw new Error('sys asset missing: ' + sub);
+            return resp.arrayBuffer();
+        }
         const b64 = await window.go.main.App.ReadPackFile(pack.id, path);
         const bin = atob(b64);
         const buf = new Uint8Array(bin.length);
@@ -201,6 +215,35 @@ export class CartridgeManager {
                 break;
             case OPS.PHYS_KINEMATIC:
                 cell.pendingPhys.push(() => this.sim.setBodyKinematicTarget(cell.fq(c.id), c.pos, c.quat));
+                break;
+
+            // -- articulated rigs -------------------------------------------
+            case OPS.ARTI_CREATE: {
+                if (!isValidLocalId(c.id)) throw new Error('bad id');
+                if (cell.artiIds.size >= 4) throw new Error('articulation budget');
+                const d = c.data || {};
+                if (!Array.isArray(d.bodies) || d.bodies.length === 0 || d.bodies.length > 64)
+                    throw new Error('bad rig: bodies');
+                if ((d.dofInfo || []).length > 64) throw new Error('bad rig: dofs');
+                cell.pendingPhys.push(() => {
+                    this.sim.createArticulation(cell.fq(c.id), d, c.spawn);
+                    cell.artiIds.add(c.id);
+                });
+                break;
+            }
+            case OPS.ARTI_DRIVE:
+                cell.pendingPhys.push(() =>
+                    this.sim.setArticulationDriveTargets(cell.fq(c.id), c.targets || []));
+                break;
+            case OPS.ARTI_RESET:
+                cell.pendingPhys.push(() =>
+                    this.sim.applyArticulationInit(cell.fq(c.id), { x: c.x !== undefined ? c.x : 0 }));
+                break;
+            case OPS.ARTI_REMOVE:
+                cell.pendingPhys.push(() => {
+                    this.sim.removeArticulation(cell.fq(c.id));
+                    cell.artiIds.delete(c.id);
+                });
                 break;
 
             // -- retained scene graph ---------------------------------------
@@ -309,6 +352,15 @@ export class CartridgeManager {
         for (const cell of this.cells.values()) {
             if (!cell.ready || cell.dead) continue;
             const meta = { events: cell.events, messages: cell.inbox };
+            // Joint states for this cell's articulations, fresh every frame
+            // so policies can observe and drive with no added latency.
+            if (cell.artiIds.size > 0) {
+                meta.arti = {};
+                for (const local of cell.artiIds) {
+                    const js = this.sim.articulationJointState(cell.fq(local));
+                    if (js) meta.arti[local] = js;
+                }
+            }
             if (this.epoch !== cell.lastEpochSent) {
                 meta.ids = this.cachedIds;
                 cell.lastEpochSent = this.epoch;
@@ -323,6 +375,16 @@ export class CartridgeManager {
             cell.iframe.contentWindow.postMessage({ t: 'frame', bin, meta }, '*', [bin.buffer]);
             cell.events = [];
             cell.inbox = [];
+        }
+    }
+
+    // Reset every articulation to its init pose and tell the cells why.
+    resetArticulations() {
+        for (const cell of this.cells.values()) {
+            for (const local of cell.artiIds) {
+                this.sim.applyArticulationInit(cell.fq(local), { x: 0 });
+            }
+            cell.inbox.push({ from: 'sys', topic: 'sys.reset', data: {} });
         }
     }
 

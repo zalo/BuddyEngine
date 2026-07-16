@@ -74,8 +74,12 @@ buddy.onFrame((world) => {
         lastHop = world.time;
     }
 
-    // Startle when the sword buddy's pelvis gets close.
-    const pelvis = world.bodies.get('sys/avatar/pelvis');
+    // Startle when any humanoid's pelvis gets close (buddies own their
+    // rigs now, so find one generically).
+    let pelvis = null;
+    for (const [id, b] of world.bodies) {
+        if (id.endsWith('.pelvis')) { pelvis = b; break; }
+    }
     if (pelvis) {
         const ax = x - pelvis.pos[0], az = z - pelvis.pos[2];
         const d = Math.hypot(ax, az);

@@ -29,9 +29,9 @@ desktop plane (X right, Z up, Y depth, meters; `ppm` pixels-per-meter).
 | `sys` | the buddy system (host) |
 | `b<N>` | a buddy instance (assigned at spawn) |
 | `sys/ground`, `sys/wall_l`, `sys/win:<hwnd>`, `sys/icon:<n>` | desktop colliders |
-| `sys/avatar/<link>` | the native humanoid's links (`sys/avatar/pelvis`, …) |
 | `sys/target` | the strike target (the cursor's physics proxy) |
 | `b3/ball`, `b3/fx.flame` | objects owned by buddy `b3` |
+| `b1/avatar.pelvis`, `b1/avatar.sword` | links of buddy `b1`'s articulation `avatar` |
 
 Cells name their own objects with bare local IDs (`[\w.\-:]+`, ≤64 chars);
 the host prefixes and enforces ownership. Foreign objects are readable world
@@ -97,6 +97,28 @@ ball.remove();
 
 Buddy↔buddy interaction is physical (collision groups) plus the bus —
 never direct mutation of foreign bodies.
+
+### Articulated rigs
+
+```js
+const rig = buddy.phys.articulation('avatar', rigData, {x: -1.5});
+rig.state                       // {dofPos, dofVel} — refreshed every frame
+rig.drive(targets)              // PD drive targets by dof index
+rig.linkBody('pelvis')          // world body id: '<me>/avatar.pelvis'
+rig.reset(x); rig.remove();
+```
+
+`rigData` is engine-agnostic: named links (collision geoms, mass/inertia/com),
+joints (spherical/revolute/fixed, axes, limits, PD stiffness/damping/maxForce,
+armature), `dofInfo` ordering and an init pose. MimicKit MJCF humanoids lower
+to it today (see the swordfighter pack's `mimickit.js`); mecanim-style bone
+chains and GLTF skeleton proxies lower to the same structure — pair with
+`gfx.gltf` + per-link `node.attach` (or a future `skin.bind`) to skin them.
+Because drive commands flush at the end of the same frame callback that
+observed the world, obs→action latency is one host frame, identical to a
+host-native controller. The swordfighter runs its ONNX policies (via
+onnxruntime-web booted *inside the cell* from `sys:vendor/...` shared assets)
+in exactly this loop.
 
 ## Rendering (retained three.js over the wire)
 
@@ -178,12 +200,11 @@ emergent interactions; formal contact events are a v2 item.
   every moddable WebGL platform makes); the host watchdog + WebGL
   context-loss reload recover, and Workshop moderation is the social backstop.
 
-## Porting a SwordBrawl-style buddy
+## Reference implementation
 
-The native humanoid still runs host-side. To ship one as a pack: put
-`llc/hlc.onnx` in the pack, run onnxruntime-web *inside the cell*
-(`buddy.assets.bytes('ort.wasm')` + `buddy.assets.wasm`), spawn the
-articulation via `phys.spawn` per link — or (v2) a `phys.articulation`
-command that takes the MJCF blob, since the host already knows how to build
-it. Observations come straight from `world.bodies`; actions go back as drive
-targets. That's the planned `"avatar"` manifest section.
+The host has no built-in character — the default buddy IS a pack. See
+`workshop/swordfighter/`: `mimickit.js` (MJCF parser + ONNX metadata
+extraction + quat math) and `main.js` (in-cell onnxruntime, rig spawn,
+mesh building, observation construction from `world.bodies` +
+`world.arti`, 30Hz HLC/LLC control in the frame callback, strike/idle
+behaviors). `workshop/wisp/` is the minimal sprite-actor example.
