@@ -159,6 +159,31 @@ buddy.publishCanvas('screenTex', canvas);   // transferToImageBitmap → transfe
 Declarative and cartridge visuals are the *same* API — a cartridge is just a
 `tex.define` whose pixels come from the cell instead of a pack file.
 
+### DOM view modality (direct iframe compositing)
+
+For DOM-native renderers (Live2D widgets, HTML speech bubbles, CSS-animated
+avatars) a cell can ask the host to composite its iframe *directly* instead
+of publishing textures:
+
+```js
+buddy.view.show({ layer: 'above' });   // or .set({visible, layer:'above'|'below', opacity})
+```
+
+The iframe becomes fullscreen and transparent, layered above or below the
+shared three.js canvas (always under host UI). `pointer-events: none` is
+forced — input still flows through the host and comes back as pointer
+events on your physics bodies, so the usual pattern is: spawn a plane-locked
+body as the avatar's anchor, and each frame move your DOM elements to
+`toScreen(body.pos)` (CSS px = `(wx*ppm + wPx/2) / devicePixelRatio`,
+`(groundPy - wz*ppm) / devicePixelRatio`). Native-resolution rendering,
+zero per-frame copies; the trade-off is that view pixels don't depth-sort
+against scene objects — pick `above` or `below`. Sandboxing is unchanged
+(null origin, no network); note the cell CSP blocks `<style>`/`style=""`
+parsing, so set styles via the CSSOM. Gotcha: while the iframe is hidden
+(before the first `view.show`) it gets **no requestAnimationFrame ticks** —
+call `view.show()` *before* awaiting anything that rides a rAF loop (DOM
+renderer boot/load events), not after. `workshop/live2d/` is the reference.
+
 ## Assets & WASM
 
 ```js

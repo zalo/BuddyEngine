@@ -164,6 +164,29 @@ const buddy = {
         on(topic, cb) { state.busCbs.set(topic, cb); },
     },
 
+    // DOM view modality: composite this cell's iframe directly with the
+    // desktop (fullscreen, transparent, pointer-events:none — input still
+    // arrives via physics hit-testing on your bodies). Render anything into
+    // your own document: Live2D, HTML overlays, a <canvas> you position.
+    // Note: the cell CSP blocks <style> tags and style="" attributes; set
+    // styles through the CSSOM (el.style.foo = ...), which is allowed.
+    view: {
+        set(props) {
+            if (props && props.visible) {
+                // The iframe only composites transparently if its own
+                // document is transparent; also drop the default margin so
+                // CSS pixels line up with the host viewport.
+                document.documentElement.style.background = 'transparent';
+                document.body.style.background = 'transparent';
+                document.body.style.margin = '0';
+                document.body.style.overflow = 'hidden';
+            }
+            send({ op: 'view.set', ...props });
+        },
+        show(opts = {}) { this.set({ visible: true, ...opts }); },
+        hide() { this.set({ visible: false }); },
+    },
+
     // Escape hatch for cartridge-style visuals: render into any canvas you
     // like in here (OffscreenCanvas + WebGL/2D), then publish frames:
     publishCanvas(texId, offscreenCanvas, opts = {}) {

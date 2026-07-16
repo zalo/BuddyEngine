@@ -86,6 +86,12 @@ export const OPS = {
     NODE_REMOVE: 'node.remove',     // {id}
     ANIM: 'anim',                   // {id (gltf node), clip, action:'play'|'stop'|'crossfade', loop?:'repeat'|'once', speed?, fade?}
 
+    // DOM view: composite the cell's own iframe over/under the scene.
+    // The iframe becomes fullscreen, transparent and pointer-events:none —
+    // the cell renders anything it likes in its own DOM (Live2D, HTML UI)
+    // while input keeps flowing through host physics hit-testing.
+    VIEW_SET: 'view.set',           // {visible?, layer?:'above'|'below', opacity?:0..1}
+
     // assets & bus & lifecycle
     ASSET_FETCH: 'asset.fetch',     // {reqId, path} -> host replies {t:'asset', reqId, bytes|error}
     BUS_SEND: 'bus.send',           // {to:'b<N>'|'*', topic, data} — data is structured-clone JSON

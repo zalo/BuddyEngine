@@ -66,6 +66,25 @@ class Cell {
 
     fq(localId) { return this.id + '/' + localId; }
 
+    // DOM view modality: composite this cell's iframe directly over (or
+    // under) the three.js canvas. The iframe stays sandboxed/null-origin;
+    // pointer-events:none is forced so input always lands on the host,
+    // which routes it back through physics hit-testing like any buddy.
+    setView(c) {
+        const f = this.iframe;
+        if (!f) return;
+        if (!c.visible) {
+            f.style.display = 'none';
+            return;
+        }
+        const layer = c.layer === 'below' ? '-1' : '5'; // menu=20, overlay=10
+        f.style.cssText =
+            'display:block; position:fixed; inset:0; width:100vw; height:100vh;' +
+            'border:none; background:transparent; pointer-events:none;' +
+            'z-index:' + layer + ';' +
+            'opacity:' + (typeof c.opacity === 'number' ? Math.max(0, Math.min(1, c.opacity)) : 1) + ';';
+    }
+
     async start() {
         const iframe = document.createElement('iframe');
         iframe.setAttribute('sandbox', 'allow-scripts');
@@ -289,6 +308,11 @@ export class CartridgeManager {
             }
             case OPS.NODE_REMOVE: cell.mirror.removeNode(c); break;
             case OPS.ANIM: cell.mirror.anim(c); break;
+
+            // -- DOM view ---------------------------------------------------
+            case OPS.VIEW_SET:
+                cell.setView(c);
+                break;
 
             // -- assets & bus -----------------------------------------------
             case OPS.ASSET_FETCH:
