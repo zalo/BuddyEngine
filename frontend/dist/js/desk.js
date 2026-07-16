@@ -68,30 +68,57 @@ export class Desk {
     // Windows become platform strips along their top edge (souptoys-style:
     // the buddy stands on and bumps into window tops). Solid interiors would
     // entomb the buddy on a busy desktop.
+    // Exposed x-intervals of a window's top edge: the full edge minus every
+    // higher-z window rect that covers that edge line. `above` is the list
+    // of windows in front of this one (the tracker sends topmost-first).
+    static exposedTopSegments(w, above) {
+        let segs = [[w.x, w.x + w.w]];
+        for (const h of above) {
+            if (h.y > w.y || w.y > h.y + h.h) continue; // doesn't cover the edge line
+            const hx0 = h.x, hx1 = h.x + h.w;
+            const out = [];
+            for (const [a, b] of segs) {
+                if (hx1 <= a || hx0 >= b) { out.push([a, b]); continue; }
+                if (hx0 > a) out.push([a, hx0]);
+                if (hx1 < b) out.push([hx1, b]);
+            }
+            segs = out;
+            if (!segs.length) break;
+        }
+        return segs.filter(([a, b]) => b - a >= 60); // ignore slivers < 60px
+    }
+
     updateWindows(windows) {
         const STRIP_HZ = 0.12; // half-thickness of the platform, meters
         const seen = new Set();
-        for (const w of windows) {
-            const key = 'win:' + w.hwnd;
-            seen.add(key);
-            const top = this.toWorld(w.x + w.w / 2, w.y);
-            const b = {
-                cx: top.x,
-                cz: top.z - STRIP_HZ,
-                hx: w.w / 2 / this.ppm,
-                hz: STRIP_HZ,
-            };
-            const existing = this.sim.staticActors.get(key);
-            if (existing) {
-                if (Math.abs(existing.box.hx - b.hx) < 0.01) {
-                    // Same size: sweep the kinematic collider so the buddy
-                    // gets shoved with the window's velocity.
-                    this.sim.setKinematicGoal(key, b.cx, b.cz);
-                    continue;
+        for (let i = 0; i < windows.length; i++) {
+            const w = windows[i];
+            // Platform strips exist only where the top edge is actually
+            // visible — occluded stretches are trimmed away.
+            const segs = Desk.exposedTopSegments(w, windows.slice(0, i));
+            for (let j = 0; j < segs.length; j++) {
+                const [x0, x1] = segs[j];
+                const key = `win:${w.hwnd}:${j}`;
+                seen.add(key);
+                const top = this.toWorld((x0 + x1) / 2, w.y);
+                const b = {
+                    cx: top.x,
+                    cz: top.z - STRIP_HZ,
+                    hx: (x1 - x0) / 2 / this.ppm,
+                    hz: STRIP_HZ,
+                };
+                const existing = this.sim.staticActors.get(key);
+                if (existing) {
+                    if (Math.abs(existing.box.hx - b.hx) < 0.01) {
+                        // Same size: sweep the kinematic collider so the
+                        // buddy gets shoved with the window's velocity.
+                        this.sim.setKinematicGoal(key, b.cx, b.cz);
+                        continue;
+                    }
+                    this.sim.removeStatic(key); // resized/re-trimmed: rebuild
                 }
-                this.sim.removeStatic(key); // resized: rebuild the shape
+                this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 2.0, b.hz);
             }
-            this.sim.addKinematicBox(key, b.cx, 0, b.cz, b.hx, 2.0, b.hz);
         }
         for (const key of this.windowKeys) {
             if (!seen.has(key)) this.sim.removeStatic(key);
