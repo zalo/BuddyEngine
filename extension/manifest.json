@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "BuddyEngine Buddies",
+    "version": "0.1.0",
+    "description": "Desktop buddies on every page: a shared physics world of sandboxed characters that stand on page content, chase your cursor, and can be grabbed and thrown.",
+    "content_scripts": [
+        {
+            "matches": ["http://*/*", "https://*/*"],
+            "js": ["content.js"],
+            "run_at": "document_idle",
+            "all_frames": false
+        }
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "buddies@buddyengine.example",
+            "strict_min_version": "121.0"
+        },
+        "gecko_android": {
+            "strict_min_version": "121.0"
+        }
+    }
+}

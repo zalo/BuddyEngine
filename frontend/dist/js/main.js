@@ -109,6 +109,9 @@ async function boot() {
         renderer.setGhostBoxes(iconColliders ? [] : icons.map(r => desk.rectToBox(r)));
     });
 
+    // Host-page debug handle (no pack code ever runs in this context).
+    window.buddyDebug = { sim, desk, renderer, interact, cartMgr };
+
     document.getElementById('overlay').style.display = 'none';
     running = true;
     lastSimTimestamp = performance.now();
