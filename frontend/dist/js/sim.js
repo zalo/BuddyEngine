@@ -272,6 +272,7 @@ export class SimWorld {
         if (desc.kinematic) actor.setRigidBodyFlag(PhysX.PxRigidBodyFlagEnum.eKINEMATIC, true);
         actor.setAngularDamping(0.05);
         actor.setLinearDamping(0.01);
+        if (typeof actor.setMaxLinearVelocity === 'function') actor.setMaxLinearVelocity(80.0);
         this.scene.addActor(actor);
         this.dynBodies.set(fqid, { actor, radius, kinematic: !!desc.kinematic });
     }
@@ -354,6 +355,29 @@ export class SimWorld {
         return { ids, buf };
     }
 
+    // Escape net: teleport any Buddy-API body that leaves the play volume
+    // back above the ground with zeroed velocity. Returns rescued count.
+    rescueStrayBodies(halfW) {
+        const PhysX = this.PhysX;
+        let rescued = 0;
+        for (const [fqid, b] of this.dynBodies) {
+            if (b.kinematic) continue;
+            const p = b.actor.getGlobalPose().get_p();
+            const x = p.get_x(), y = p.get_y(), z = p.get_z();
+            if (isFinite(x) && isFinite(y) && isFinite(z) &&
+                Math.abs(x) < halfW + 3 && Math.abs(y) < 6 && z > -3 && z < 90) {
+                continue;
+            }
+            const nx = Math.max(-halfW + 1, Math.min(halfW - 1, isFinite(x) ? x : 0));
+            b.actor.setGlobalPose(new PhysX.PxTransform(
+                new PhysX.PxVec3(nx, 0, 2.0), new PhysX.PxQuat(0, 0, 0, 1)), true);
+            b.actor.setLinearVelocity(new PhysX.PxVec3(0, 0, 0));
+            b.actor.setAngularVelocity(new PhysX.PxVec3(0, 0, 0));
+            rescued++;
+        }
+        return rescued;
+    }
+
     bodyPose(fqid) {
         let actor = null;
         if (fqid.startsWith('sys/avatar/')) {
@@ -427,7 +451,7 @@ export class SimWorld {
             link.setAngularDamping(0.01);
             link.setLinearDamping(0.0);
             link.setMaxDepenetrationVelocity(10.0);
-            link.setMaxLinearVelocity(1000.0);
+            link.setMaxLinearVelocity(80.0);   // below tunneling speed for the containment walls
             link.setMaxAngularVelocity(1000.0);
             if (typeof link.setSleepThreshold === 'function') link.setSleepThreshold(5e-5);
             if (typeof link.setStabilizationThreshold === 'function') link.setStabilizationThreshold(1e-5);
@@ -740,10 +764,14 @@ export class SimWorld {
         const tarVel = this.targetState.vel;
 
         let idx = 0;
+        // ASE uses absolute Z; make it support-relative AND clamp to the
+        // strike-reachable band the HLC was trained on (pillar height), so a
+        // cursor at the top of the screen reads as "high but reachable".
+        const relZ = Math.min(Math.max(tarPos[2] - supportZ, 0.2), 2.2);
         const tarRel = [
             tarPos[0] - root.pos[0],
             tarPos[1] - root.pos[1],
-            tarPos[2] - supportZ,   // ASE uses absolute Z; make it support-relative
+            relZ,
         ];
         const localTarPos = quatRotateVec(headingInv, tarRel);
         taskObs[idx++] = localTarPos[0];

@@ -35,14 +35,23 @@ export class Desk {
 
     createStaticEnvironment() {
         const halfW = this.screenW / 2 / this.ppm;
-        // Ground: top face at z=0 (taskbar top).
-        this.sim.addStaticBox('ground', 0, 0, -0.5, halfW + 20, 5, 0.5);
-        // Screen edge walls so the buddy can't wander offscreen.
-        this.sim.addStaticBox('wall_l', -halfW - 0.5, 0, 20, 0.5, 5, 25);
-        this.sim.addStaticBox('wall_r', halfW + 0.5, 0, 20, 0.5, 5, 25);
-        for (const k of ['ground', 'wall_l', 'wall_r']) {
+        // Ground: top face at z=0 (taskbar top). Deep in Y and 10m thick so
+        // hard throws can't tunnel through it or slip past it sideways.
+        this.sim.addStaticBox('ground', 0, 0, -5, halfW * 2 + 40, 60, 5);
+        // Screen edge walls (2m thick, inner face at the screen edge).
+        this.sim.addStaticBox('wall_l', -halfW - 2, 0, 25, 2, 60, 30);
+        this.sim.addStaticBox('wall_r', halfW + 2, 0, 25, 2, 60, 30);
+        // Invisible depth slabs keep everything in the desktop plane
+        // (|y| < ~3.5) — bodies knocked "into the screen" bounce back.
+        this.sim.addStaticBox('wall_back', 0, -4.5, 25, halfW * 2 + 40, 1, 35);
+        this.sim.addStaticBox('wall_front', 0, 4.5, 25, halfW * 2 + 40, 1, 35);
+        for (const k of ['wall_l', 'wall_r', 'wall_back', 'wall_front']) {
             const entry = this.sim.staticActors.get(k);
-            if (entry && k !== 'ground') entry.box.wall = true;
+            if (entry) entry.box.wall = true;
+        }
+        for (const k of ['wall_back', 'wall_front']) {
+            const entry = this.sim.staticActors.get(k);
+            if (entry) entry.box.debugHide = true; // would fill the whole view
         }
     }
 

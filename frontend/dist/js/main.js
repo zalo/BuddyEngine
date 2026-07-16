@@ -26,6 +26,7 @@ let lastSimTimestamp = 0;
 let lastIdleSkill = 0;
 let mode = 'strike';
 let iconColliders = false; // off by default; toggle in the buddy menu
+let escapeCheck = 0;
 
 function setStatus(msg) {
     const el = document.getElementById('loadStatus');
@@ -230,15 +231,18 @@ async function mainLoop(timestamp) {
         sim.step();
     }
 
-    // Auto-reset if the sim explodes or the buddy leaves the world.
+    // Auto-reset if the sim explodes or the buddy leaves the play volume,
+    // and rescue any stray Buddy-API bodies (wisp & co).
     try {
+        const halfW = desk.screenW / 2 / desk.ppm;
         const root = sim.rootPose();
         const rz = root.pos[2], rx = root.pos[0], ry = root.pos[1];
         if (resetGraceFrames > 0) resetGraceFrames--;
-        else if (!isFinite(rz) || Math.abs(rz) > 60 || Math.abs(ry) > 30 ||
-                 Math.abs(rx) > desk.screenW / desk.ppm) {
+        else if (!isFinite(rz) || rz < -3 || rz > 90 || Math.abs(ry) > 6 ||
+                 Math.abs(rx) > halfW + 3) {
             resetBuddy();
         }
+        if (escapeCheck++ % 30 === 0) sim.rescueStrayBodies(halfW);
     } catch (e) {}
 
     renderer.updateMeshes(sim.links);
@@ -282,18 +286,25 @@ function setupMenu() {
         closeMenu();
     });
     const iconsBtn = document.getElementById('menu-icons');
-    iconsBtn.addEventListener('click', () => {
+    const toggleIconColliders = () => {
         iconColliders = !iconColliders;
         if (!iconColliders) desk.updateIcons([]);
         iconsBtn.textContent = iconColliders ? 'Icon colliders: on' : 'Icon colliders: off';
-        closeMenu();
-    });
+    };
+    iconsBtn.addEventListener('click', () => { toggleIconColliders(); closeMenu(); });
     const debugBtn = document.getElementById('menu-debug');
-    debugBtn.addEventListener('click', () => {
+    const toggleDebug = () => {
         const v = !renderer.debugGroup.visible;
         renderer.setDebugVisible(v);
         debugBtn.textContent = v ? 'Debug colliders: on' : 'Debug colliders: off';
-        closeMenu();
+    };
+    debugBtn.addEventListener('click', () => { toggleDebug(); closeMenu(); });
+
+    // Tray menu commands from the backend.
+    window.runtime.EventsOn('tray', (id) => {
+        if (id === 'reset') resetBuddy();
+        else if (id === 'debug') toggleDebug();
+        else if (id === 'icons') toggleIconColliders();
     });
     document.getElementById('menu-quit').addEventListener('click', () => {
         window.go.main.App.Quit();

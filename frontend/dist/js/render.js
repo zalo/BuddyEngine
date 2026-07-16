@@ -75,8 +75,9 @@ export class Renderer {
         if (!this.debugGroup.visible) return;
 
         for (const [key, entry] of colliders) {
-            let dm = this.debugMeshes.get(key);
             const b = entry.box;
+            if (b.debugHide) continue;
+            let dm = this.debugMeshes.get(key);
             if (dm && (Math.abs(dm.hx - b.hx) > 1e-4 || Math.abs(dm.hz - b.hz) > 1e-4)) {
                 this.debugGroup.remove(dm.group);
                 this.debugMeshes.delete(key);

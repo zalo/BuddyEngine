@@ -162,9 +162,18 @@ export class Interact {
         let mass = 1.0;
         try { mass = this.dragBody.getMass(); } catch (e) {}
 
-        const dx = cw.x - p.get_x();
-        const dy = 0 - p.get_y();       // pull back to the desktop plane
-        const dz = cw.z - p.get_z();
+        let dx = cw.x - p.get_x();
+        let dy = 0 - p.get_y();       // pull back to the desktop plane
+        let dz = cw.z - p.get_z();
+
+        // Clamp the spring stretch so yanking the mouse across the screen
+        // can't accelerate bodies to tunneling speeds.
+        const len = Math.hypot(dx, dy, dz);
+        const MAX_STRETCH = 2.5;
+        if (len > MAX_STRETCH) {
+            const s = MAX_STRETCH / len;
+            dx *= s; dy *= s; dz *= s;
+        }
 
         const force = new PhysX.PxVec3(
             dx * mass * DRAG_STIFFNESS,
@@ -179,13 +188,11 @@ export class Interact {
         }
     }
 
-    // World position for the strike target: the cursor, held slightly above
-    // the local support so the buddy swings at head/torso height when the
-    // mouse is near the ground.
+    // World position for the strike target: exactly the cursor. Reachability
+    // clamping happens in the task observation (sim.buildTaskObs), not here,
+    // so the target ring never snaps or lags the mouse.
     targetWorld() {
         const cw = this.cursorWorld();
-        const support = this.sim.supportHeightAt(cw.x, cw.z);
-        const z = Math.max(cw.z, support + 0.25);
-        return [cw.x, 0, Math.min(z, support + 2.2)];
+        return [cw.x, 0, Math.max(cw.z, 0.05)];
     }
 }

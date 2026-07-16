@@ -18,6 +18,7 @@ import (
 type App struct {
 	ctx      context.Context
 	overlay  *win32.Overlay
+	tray     *win32.Tray
 	shop     *workshop.Manager
 	stop     chan struct{}
 	lastBeat int64 // unix ms of last frontend heartbeat
@@ -44,6 +45,23 @@ func (a *App) startup(ctx context.Context) {
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
+
+	// The overlay has no taskbar button, so the tray icon is the way to
+	// find and control BuddyEngine.
+	a.tray = win32.NewTray("BuddyEngine", []win32.TrayItem{
+		{ID: "reset", Label: "Reset buddy"},
+		{ID: "debug", Label: "Toggle debug colliders"},
+		{ID: "icons", Label: "Toggle icon colliders"},
+		{ID: "", Label: ""},
+		{ID: "quit", Label: "Quit BuddyEngine"},
+	}, func(id string) {
+		switch id {
+		case "quit":
+			runtime.Quit(a.ctx)
+		default:
+			runtime.EventsEmit(a.ctx, "tray", id)
+		}
+	})
 }
 
 func (a *App) domReady(ctx context.Context) {
@@ -51,6 +69,15 @@ func (a *App) domReady(ctx context.Context) {
 	go a.cursorLoop()
 	go a.desktopLoop()
 	go a.watchdogLoop()
+	// Drop the taskbar button once the window is actually visible.
+	go func() {
+		for _, delay := range []time.Duration{2 * time.Second, 6 * time.Second} {
+			time.Sleep(delay)
+			if a.overlay != nil {
+				a.overlay.RefreshTaskbarState()
+			}
+		}
+	}()
 }
 
 // watchdogLoop reloads the frontend if its heartbeat stops (unhandled JS
@@ -79,6 +106,9 @@ func (a *App) watchdogLoop() {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.tray != nil {
+		a.tray.Dispose()
+	}
 	close(a.stop)
 }
 
