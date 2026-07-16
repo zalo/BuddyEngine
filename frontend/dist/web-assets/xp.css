@@ -1,0 +1,135 @@
+/* Stand-in Windows XP desktop for the web demo: Bliss wallpaper, Luna-blue
+   taskbar and a couple of draggable "windows" that double as physics
+   platforms. The engine canvas (z2) and buddy view iframes (z5) composite
+   above; engine menu/overlay stay on top (z10/z20). */
+
+html, body { touch-action: none; overscroll-behavior: none; }
+
+#xp-desktop {
+    position: fixed; inset: 0;
+    background: #235cdc url('./bliss.jpg') center / cover no-repeat;
+    z-index: 0;
+    overflow: hidden;
+}
+
+/* --- windows ------------------------------------------------------------ */
+.xp-window {
+    position: absolute;
+    min-width: 220px;
+    background: #ece9d8;
+    border: 1px solid #0831d9;
+    border-radius: 8px 8px 3px 3px;
+    box-shadow: 2px 4px 12px rgba(0,0,30,0.4), inset 0 0 0 3px #0855dd;
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.xp-titlebar {
+    display: flex; align-items: center;
+    height: 28px;
+    padding: 0 4px 0 10px;
+    border-radius: 7px 7px 0 0;
+    background: linear-gradient(180deg,
+        #0997ff 0%, #0053ee 8%, #0050ee 40%, #0066ff 88%, #003dd7 93%, #0031c9 100%);
+    color: #fff;
+    font-weight: bold;
+    font-size: 13px;
+    text-shadow: 1px 1px 1px #0f1089;
+    cursor: grab;
+    touch-action: none;
+}
+.xp-titlebar:active { cursor: grabbing; }
+.xp-title { flex: 1; overflow: hidden; white-space: nowrap; pointer-events: none; }
+.xp-buttons { display: flex; gap: 2px; pointer-events: none; }
+.xp-buttons b {
+    width: 21px; height: 21px;
+    border-radius: 3px;
+    border: 1px solid #fff;
+    background: linear-gradient(135deg, #3b81f3, #1b53c8);
+    position: relative;
+}
+.xp-buttons .xp-close { background: linear-gradient(135deg, #e9967c, #c93c1d); }
+.xp-buttons b::after {
+    content: ''; position: absolute; inset: 0;
+    color: #fff; font: bold 13px/19px Tahoma, sans-serif; text-align: center;
+}
+.xp-buttons .xp-min::after { content: '−'; }
+.xp-buttons .xp-max::after { content: '□'; font-size: 11px; }
+.xp-buttons .xp-close::after { content: '×'; }
+.xp-body {
+    padding: 12px;
+    font-size: 12px;
+    color: #222;
+    line-height: 1.5;
+}
+.xp-body p { margin: 0 0 8px; }
+.xp-notepad {
+    font-family: 'Lucida Console', Consolas, monospace;
+    background: #fff;
+    border: 1px solid #7f9db9;
+    margin: 4px;
+    white-space: pre-wrap;
+}
+
+/* --- taskbar ------------------------------------------------------------ */
+#xp-taskbar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    height: var(--xp-taskbar-h, 36px);
+    display: flex; align-items: stretch;
+    background: linear-gradient(180deg,
+        #3168d5 0%, #4993e6 3%, #2157d7 6%, #2563e2 10%, #1941a5 88%, #1941a5 100%);
+    background-color: #245edb;
+    box-shadow: 0 -1px 0 #0831d9;
+    z-index: 1;
+    font-family: Tahoma, 'Segoe UI', sans-serif;
+}
+#xp-start {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 22px 0 10px;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    background: linear-gradient(180deg,
+        #7ede77 0%, #3c9f38 8%, #2f8c2c 45%, #37992f 85%, #1f5f1d 100%);
+    box-shadow: 2px 0 6px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.5);
+    color: #fff;
+    font: bold italic 17px Tahoma, 'Segoe UI', sans-serif;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+    cursor: pointer;
+}
+.xp-flag {
+    display: grid;
+    grid-template-columns: 9px 9px;
+    grid-template-rows: 7px 7px;
+    gap: 1.5px;
+    transform: skewY(-6deg);
+    pointer-events: none;
+}
+.xp-flag i { border-radius: 1.5px; }
+.xp-flag i:nth-child(1) { background: #f65314; }
+.xp-flag i:nth-child(2) { background: #7cbb00; }
+.xp-flag i:nth-child(3) { background: #00a1f1; }
+.xp-flag i:nth-child(4) { background: #ffbb00; }
+#xp-tasks { flex: 1; }
+#xp-tray {
+    display: flex; align-items: center;
+    padding: 0 14px 0 18px;
+    background: linear-gradient(180deg,
+        #1290e9 0%, #19b9f3 3%, #0e8fdd 6%, #1090e8 10%, #0a5cc0 88%, #0a5cc0 100%);
+    box-shadow: inset 2px 0 4px rgba(0,0,30,0.35);
+    color: #fff;
+    font-size: 12px;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+}
+
+/* Engine canvas is fixed fullscreen above the XP chrome but below buddy
+   view iframes (z5) and UI; web-host.js also sets pointer-events: none. */
+canvas.buddy-engine-canvas {
+    position: fixed; inset: 0; z-index: 2;
+}
+
+/* Mobile: chunkier taskbar for fingers, narrower windows. */
+@media (pointer: coarse) {
+    :root { --xp-taskbar-h: 44px; }
+    #xp-start { font-size: 19px; }
+    .xp-window { min-width: 170px; }
+}

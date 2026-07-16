@@ -1,0 +1,58 @@
+# Deploys the BuddyEngine web demo to GitHub Pages on every push to main.
+# (Repo settings: Pages -> Source = GitHub Actions.)
+#
+# The site is the desktop frontend (frontend/dist) with web.html as the
+# entry point (it stubs the Wails backend and provides the stand-in XP
+# desktop) and the workshop packs served statically under packs/.
+name: Deploy web demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site
+        run: |
+          set -eux
+          mkdir -p _site/packs
+          cp -r frontend/dist/. _site/
+          cp _site/web.html _site/index.html
+          # Packs: every workshop folder with a main.js. ROMs never ship
+          # (also gitignored); native build sources aren't needed at runtime.
+          rsync -a \
+            --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
+            --exclude='native/' \
+            workshop/ _site/packs/
+          # Pack index consumed by web-host.js.
+          ls -d workshop/*/ | xargs -n1 basename \
+            | while read p; do [ -f "workshop/$p/main.js" ] && echo "$p" || true; done \
+            | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))' \
+            > _site/packs-index.json
+          cat _site/packs-index.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

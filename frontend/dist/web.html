@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>BuddyEngine — web demo</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./web-assets/xp.css">
+</head>
+<body>
+
+<!-- Stand-in desktop: Windows XP Bliss + taskbar (see web-assets/xp.css).
+     The engine's transparent canvas + buddy view iframes composite on top. -->
+<div id="xp-desktop">
+    <div class="xp-window" id="xpwin1" data-hwnd="1001">
+        <div class="xp-titlebar">
+            <span class="xp-title">My Documents</span>
+            <span class="xp-buttons"><b class="xp-min"></b><b class="xp-max"></b><b class="xp-close"></b></span>
+        </div>
+        <div class="xp-body">
+            <p>Drag me around — buddies stand on my top edge and ride along.</p>
+            <p>Grab a buddy and throw it. Poke the Live2D girl. Right-click
+               (or tap <i>start</i>) for the engine menu.</p>
+        </div>
+    </div>
+    <div class="xp-window" id="xpwin2" data-hwnd="1002">
+        <div class="xp-titlebar">
+            <span class="xp-title">Notepad</span>
+            <span class="xp-buttons"><b class="xp-min"></b><b class="xp-max"></b><b class="xp-close"></b></span>
+        </div>
+        <div class="xp-body xp-notepad">BuddyEngine web demo
+— every buddy runs sandboxed in a null-origin iframe cell
+— one shared PhysX (WASM) world, one three.js scene
+— this window is a physics platform</div>
+    </div>
+</div>
+
+<div id="xp-taskbar">
+    <button id="xp-start"><span class="xp-flag"><i></i><i></i><i></i><i></i></span>start</button>
+    <div id="xp-tasks"></div>
+    <div id="xp-tray"><span id="xp-clock">12:00 PM</span></div>
+</div>
+
+<div id="overlay">
+    <div class="card">
+        <h1>BuddyEngine</h1>
+        <div class="spinner"></div>
+        <div class="status" id="loadStatus">Initializing...</div>
+    </div>
+</div>
+
+<div id="menu">
+    <div class="menu-title">Buddy</div>
+    <button id="menu-reset">Reset buddy</button>
+    <button id="menu-debug">Debug colliders: off</button>
+    <button id="menu-icons">Icon colliders: off</button>
+    <button id="menu-packs">Workshop packs...</button>
+    <button id="menu-close">Close menu</button>
+    <hr>
+    <button id="menu-quit" class="danger">Reload demo</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<script type="module" src="./js/web-host.js"></script>
+</body>
+</html>

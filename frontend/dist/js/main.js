@@ -57,12 +57,13 @@ async function boot() {
         screenW: bootstrap.screenW,
         screenH: bootstrap.screenH,
         workBottom: bootstrap.workBottom,
-        ppm: 140,
+        ppm: bootstrap.ppm || 140,
     });
     desk.createStaticEnvironment();
     sim.createTarget();
 
     renderer = new Renderer(desk);
+    if (bootstrap.debugOff) renderer.setDebugVisible(false);
     interact = new Interact(sim, desk, renderer);
     setupMenu();
 
