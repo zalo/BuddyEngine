@@ -81,6 +81,11 @@ export class SceneMirror {
             throw new Error('texture needs asset or bitmap');
         }
         tex.colorSpace = THREE.SRGBColorSpace;
+        if (c.nearest) { // pixel art
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            tex.generateMipmaps = false;
+        }
         this.disposeTex(c.id);
         this.texs.set(c.id, tex);
     }

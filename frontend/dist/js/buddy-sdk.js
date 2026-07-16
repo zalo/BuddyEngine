@@ -166,9 +166,9 @@ const buddy = {
 
     // Escape hatch for cartridge-style visuals: render into any canvas you
     // like in here (OffscreenCanvas + WebGL/2D), then publish frames:
-    publishCanvas(texId, offscreenCanvas) {
+    publishCanvas(texId, offscreenCanvas, opts = {}) {
         const bitmap = offscreenCanvas.transferToImageBitmap();
-        send({ op: 'tex.define', id: texId, bitmap });
+        send({ op: 'tex.define', id: texId, bitmap, nearest: !!opts.nearest });
     },
 };
 
