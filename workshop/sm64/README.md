@@ -37,7 +37,8 @@ distributed). Without it the pack loads but stays dormant, logging one line.
 
 ## Behavior state machine
 
-`idle → wander → idle` strolling, `climb` expeditions — he periodically
+`idle → wander → idle` strolling (with hops and the occasional
+crouch-backflip to stay limber), `climb` expeditions — he periodically
 scouts reachable ledges (window tops, icons), walks to the edge, jumps up
 onto them (chaining SM64 double/triple jumps for taller targets, steering
 over the lip at the apex), and enjoys the view — `chase` the cursor after a
@@ -49,7 +50,10 @@ He watches the cursor when it lingers.
 
 Mario's real geometry (up to 1024 tris, vertex colors + 704×64 ROM texture
 atlas) is rendered in-cell with WebGL2 into an OffscreenCanvas and published
-at 30 Hz as a cartridge texture on a quad riding the proxy body. SM64's own
+as a cartridge texture on a quad riding the proxy body. SM64 simulates at
+30 Hz but rendering runs at the host frame rate: vertices and position are
+lerped between the last two ticks (the libsm64-three trick), so motion is
+smooth at 60+ fps. SM64's own
 mixer is streamed into WebAudio when the cell is allowed to start an
 AudioContext (silent otherwise).
 

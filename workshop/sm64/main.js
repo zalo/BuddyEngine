@@ -328,7 +328,7 @@ const gfx = (() => {
     };
 
     return {
-        render(tris, mPos, floorY) {
+        render(tris, mPos, floorY, positions) {
             const cx = mPos[0], cy = mPos[1] + (PLANE_M / 2 - FOOT_M) * U;
             const half = PLANE_M / 2 * U;
             gl.viewport(0, 0, CANVAS_PX, CANVAS_PX);
@@ -362,14 +362,14 @@ const gfx = (() => {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, atlas);
             const n = tris * 3;
-            const feed = (buf, ptr, comps) => {
+            const feed = (buf, data) => {
                 gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-                gl.bufferData(gl.ARRAY_BUFFER, sf(ptr, n * comps), gl.DYNAMIC_DRAW);
+                gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
             };
-            feed(vbo.pos, geoPos, 3);
-            feed(vbo.col, geoCol, 3);
-            feed(vbo.norm, geoNorm, 3);
-            feed(vbo.uv, geoUv, 2);
+            feed(vbo.pos, positions.subarray(0, n * 3)); // interpolated, from JS
+            feed(vbo.col, sf(geoCol, n * 3));
+            feed(vbo.norm, sf(geoNorm, n * 3));
+            feed(vbo.uv, sf(geoUv, n * 2));
             const attr = (loc, buf, comps) => {
                 gl.bindBuffer(gl.ARRAY_BUFFER, buf);
                 gl.enableVertexAttribArray(loc);
@@ -386,7 +386,7 @@ const gfx = (() => {
 // Publish an initial (blank) frame so the texture exists before the
 // material references it, then build the nodes.
 if (gfx) {
-    gfx.render(0, [0, 0, 0], -1e6);
+    gfx.render(0, [0, 0, 0], -1e6, new Float32Array(0));
     buddy.gfx.material('matMario', { ...spriteShader, uniforms: { uTex: 'texMario' } });
     const marioNode = buddy.gfx.mesh('view', { geo: 'quad', mat: 'matMario' });
     marioNode.set({ scale: [PLANE_M, PLANE_M, 1] });
@@ -476,6 +476,7 @@ const mario = {
     grounded: true,
     target: HOME_X,      // wander/chase target x (m)
     climb: null,         // {id, tries, lastJumpT, holdA} — ledge being mounted
+    stunt: null,         // {z, a} — queued idle stunt (hop / crouch-backflip)
     fleeFrom: 0,
     stuckT: 0,
     lastDmgT: -10,
@@ -493,6 +494,7 @@ function setState(s) {
     if (mario.state === s) return;
     mario.state = s;
     mario.stateT = 0;
+    mario.stunt = null;
 }
 
 function takeDamage(now, wedges, srcSm64) {
@@ -599,12 +601,22 @@ function behave(world, now) {
             if (dc < 1.8 && Math.abs(cur.wz - mzm) < 1.5) {
                 M._mb_set_faceangle(mario.id, dc < 0.35 ? 0 : (cur.wx > mxm ? Math.PI / 2 : -Math.PI / 2));
             }
+            // restless: the occasional hop or crouch-backflip in place
+            if (!mario.stunt && mario.grounded && mario.stateT > 1 && Math.random() < 0.006) {
+                mario.stunt = Math.random() < 0.45 ? { z: 8, a: 3 } : { z: 0, a: 3 };
+            }
+            if (mario.stunt) {
+                const s = mario.stunt;
+                if (s.z > 0) { inputs.z = 1; s.z--; }          // crouch windup…
+                if (s.z <= 3 && s.a > 0) { inputs.a = 1; s.a--; } // …A while crouched = backflip
+                if (s.z <= 0 && s.a <= 0) mario.stunt = null;
+            }
             if (mario.stateT > mario.idleDur) {
                 mario.idleDur = 2 + Math.random() * 6;
                 // periodically go mountaineering: pick a reachable ledge
                 // (window top, icon) and try to jump up onto it
                 const ledges = findLedges(world.colliders, mxm, mzm);
-                if (ledges.length && Math.random() < 0.55) {
+                if (ledges.length && Math.random() < 0.65) {
                     const c = ledges[Math.floor(Math.random() * ledges.length)];
                     mario.climb = { id: c.id, tries: 0, lastJumpT: -1, holdA: 0 };
                     setState('climb');
@@ -619,7 +631,7 @@ function behave(world, now) {
         case 'wander': {
             const arrived = walkToward(mario.target, 0.45);
             // playful hop now and then
-            if (mario.grounded && Math.random() < 0.006) inputs.a = 1;
+            if (mario.grounded && Math.random() < 0.015) inputs.a = 1;
             // a ledge passing close by is too tempting
             if (mario.grounded && Math.random() < 0.01) {
                 const near = findLedges(world.colliders, mxm, mzm)
@@ -710,8 +722,8 @@ function findLedges(colliders, mxm, mzm) {
         if (c.id.startsWith('sys/wall') || c.id === 'sys/ground') continue;
         if (c.hx < 0.25) continue;                        // too narrow to stand on
         const rel = c.cz + c.hz - mzm;
-        if (rel < 0.3 || rel > 2.2) continue;             // trivial or hopeless
-        if (Math.abs(c.cx - mxm) - c.hx > 4.5) continue;  // too far to bother
+        if (rel < 0.25 || rel > 2.6) continue;            // trivial or hopeless
+        if (Math.abs(c.cx - mxm) - c.hx > 5.5) continue;  // too far to bother
         out.push(c);
     }
     return out;
@@ -722,6 +734,17 @@ function findLedges(colliders, mxm, mzm) {
 // ---------------------------------------------------------------------------
 let accum = 0;
 let booted = false;
+
+// SM64 ticks at 30Hz but the host renders at 60+: keep the last two ticks'
+// vertices and position, and lerp between them every render frame (same
+// trick as the libsm64-three reference) so motion stays smooth.
+const GEO_F = 9 * MAXT;
+const lerp = !gfx ? null : {
+    prev: new Float32Array(GEO_F), cur: new Float32Array(GEO_F),
+    out: new Float32Array(GEO_F),
+    mPrev: [0, 0, 0], mCur: [0, 0, 0],
+    trisPrev: 0, trisCur: 0,
+};
 let pokeCount = 0, lastPokeT = -10;
 let separatedT = 0;
 
@@ -793,8 +816,17 @@ buddy.onFrame((world) => {
         }
 
         const inputs = behave(world, now);
+        if (lerp) {
+            lerp.trisPrev = lerp.trisCur;
+            lerp.prev.set(lerp.cur);
+            lerp.mPrev[0] = lerp.mCur[0]; lerp.mPrev[1] = lerp.mCur[1]; lerp.mPrev[2] = lerp.mCur[2];
+        }
         const tris = M._mb_mario_tick(mario.id, 0, 1,
             inputs.sx, inputs.sy, inputs.a, inputs.b, inputs.z, statePtr);
+        if (lerp) {
+            lerp.trisCur = tris;
+            lerp.cur.set(sf(geoPos, GEO_F));
+        }
 
         const f = sf(statePtr, 16), i = si(statePtr, 16), u = su(statePtr, 16);
         mario.pos = [f[0], f[1], f[2]];
@@ -806,6 +838,7 @@ buddy.onFrame((world) => {
         mario.invinc = i[14];
         mario.grounded = !(mario.action & ACT_FLAG_AIR);
         mario.stateT += TICK;
+        if (lerp) { lerp.mCur[0] = f[0]; lerp.mCur[1] = f[1]; lerp.mCur[2] = f[2]; }
 
         // fell off the world -> hurt + respawn at home
         if (mario.pos[1] < YB + 100) {
@@ -849,11 +882,28 @@ buddy.onFrame((world) => {
         }
         mario.prevPos = mario.pos.slice();
 
-        if (gfx && tris > 0) {
-            const floorY = M._mb_find_floor_height(mario.pos[0], mario.pos[1] + 30, mario.pos[2]);
-            gfx.render(tris, mario.pos, floorY);
-        }
         if (audio) audio.tick();
+    }
+
+    // -- render (every host frame, vertices lerped between SM64 ticks) ----------
+    if (gfx && booted && lerp.trisCur > 0) {
+        const t = Math.max(0, Math.min(accum / TICK, 1));
+        const n = lerp.trisCur * 9;
+        let mp;
+        // topology changed between ticks (anim part swap): snap, don't blend
+        if (lerp.trisPrev === lerp.trisCur) {
+            for (let i = 0; i < n; i++) lerp.out[i] = lerp.prev[i] + (lerp.cur[i] - lerp.prev[i]) * t;
+            mp = [
+                lerp.mPrev[0] + (lerp.mCur[0] - lerp.mPrev[0]) * t,
+                lerp.mPrev[1] + (lerp.mCur[1] - lerp.mPrev[1]) * t,
+                lerp.mPrev[2] + (lerp.mCur[2] - lerp.mPrev[2]) * t,
+            ];
+        } else {
+            lerp.out.set(lerp.cur.subarray(0, n));
+            mp = lerp.mCur;
+        }
+        const floorY = M._mb_find_floor_height(mp[0], mp[1] + 30, mp[2]);
+        gfx.render(lerp.trisCur, mp, floorY, lerp.out);
     }
 
     // -- proxy tracking ---------------------------------------------------------

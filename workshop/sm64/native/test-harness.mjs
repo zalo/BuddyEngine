@@ -152,8 +152,14 @@ await run(3);
 check('rides a moving collider up (z=' + proxyPos()[2].toFixed(2) + ')', proxyPos()[2] > 1.0);
 GROUND.cz = -5;
 colliders = [...BASE];
-await run(3);
-check('falls back down (z=' + proxyPos()[2].toFixed(2) + ')', proxyPos()[2] < 0.8);
+// poll: he may be mid-hop/backflip at any instant, so wait for him to
+// settle on the lowered ground rather than sampling a single moment
+let fell = false;
+for (let i = 0; i < 40 && !fell; i++) {
+    await run(0.25);
+    fell = proxyPos()[2] < 0.8 && globalThis.__mario.grounded;
+}
+check('falls back down (z=' + proxyPos()[2].toFixed(2) + ')', fell);
 colliders = [...BASE, WIN];
 
 // 3. high-speed body -> damage
