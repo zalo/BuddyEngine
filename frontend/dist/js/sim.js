@@ -113,11 +113,20 @@ export class SimWorld {
             actor,
             kinematic: true,
             box: { cx, cy, cz, hx, hy, hz },
+            from: { cx, cz },
             goal: { cx, cz },
+            duration: 0,
+            elapsed: 0,
+            lastGoalAt: 0,
         });
         return actor;
     }
 
+    // New sampled position for a kinematic collider. The body sweeps there
+    // linearly over exactly one sample interval, so its rigid-body velocity
+    // equals the finite-difference velocity of the tracked window — no
+    // smoothing lag. Jumps larger than teleportDist (snap/maximize,
+    // occlusion reshuffles) teleport without imparting velocity.
     setKinematicGoal(key, cx, cz, teleportDist = 3.0) {
         const entry = this.staticActors.get(key);
         if (!entry || !entry.kinematic) return;
@@ -125,8 +134,17 @@ export class SimWorld {
             this.setKinematicPose(key, cx, cz);
             return;
         }
+        const now = performance.now() / 1000;
+        const interval = entry.lastGoalAt
+            ? Math.min(Math.max(now - entry.lastGoalAt, 1 / 120), 0.25)
+            : 1 / 30;
+        entry.lastGoalAt = now;
+        entry.from.cx = entry.box.cx;
+        entry.from.cz = entry.box.cz;
         entry.goal.cx = cx;
         entry.goal.cz = cz;
+        entry.duration = interval;
+        entry.elapsed = 0;
     }
 
     setKinematicPose(key, cx, cz) {
@@ -135,8 +153,13 @@ export class SimWorld {
         const PhysX = this.PhysX;
         entry.box.cx = cx;
         entry.box.cz = cz;
+        entry.from.cx = cx;
+        entry.from.cz = cz;
         entry.goal.cx = cx;
         entry.goal.cz = cz;
+        entry.duration = 0;
+        entry.elapsed = 0;
+        entry.lastGoalAt = performance.now() / 1000;
         entry.actor.setGlobalPose(new PhysX.PxTransform(
             new PhysX.PxVec3(cx, entry.box.cy, cz),
             new PhysX.PxQuat(0, 0, 0, 1)), true);
@@ -144,16 +167,13 @@ export class SimWorld {
 
     updateKinematics(dt) {
         const PhysX = this.PhysX;
-        const tau = 0.08;
-        const k = 1 - Math.exp(-dt / tau);
         for (const entry of this.staticActors.values()) {
-            if (!entry.kinematic) continue;
+            if (!entry.kinematic || entry.elapsed >= entry.duration) continue;
+            entry.elapsed = Math.min(entry.elapsed + dt, entry.duration);
+            const a = entry.elapsed / entry.duration;
             const b = entry.box;
-            const dx = entry.goal.cx - b.cx;
-            const dz = entry.goal.cz - b.cz;
-            if (Math.abs(dx) < 1e-5 && Math.abs(dz) < 1e-5) continue;
-            b.cx += dx * k;
-            b.cz += dz * k;
+            b.cx = entry.from.cx + (entry.goal.cx - entry.from.cx) * a;
+            b.cz = entry.from.cz + (entry.goal.cz - entry.from.cz) * a;
             entry.actor.setKinematicTarget(new PhysX.PxTransform(
                 new PhysX.PxVec3(b.cx, b.cy, b.cz),
                 new PhysX.PxQuat(0, 0, 0, 1)));

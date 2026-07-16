@@ -135,9 +135,11 @@ func (a *App) cursorLoop() {
 	}
 }
 
-// desktopLoop pushes window + desktop-icon rectangles at ~8Hz.
+// desktopLoop pushes window + desktop-icon rectangles at ~30Hz so window
+// colliders track drags with low latency (the frontend derives collider
+// velocities from these samples).
 func (a *App) desktopLoop() {
-	tick := time.NewTicker(125 * time.Millisecond)
+	tick := time.NewTicker(win32.DesktopTickMs * time.Millisecond)
 	defer tick.Stop()
 	iconTick := 0
 	var icons []win32.IconRect
@@ -153,7 +155,7 @@ func (a *App) desktopLoop() {
 			wins := win32.ListColliderWindows(self)
 			// Icons move rarely; refresh every ~2s. Occlusion changes with
 			// every window move, so filter on every tick.
-			if iconTick%16 == 0 {
+			if iconTick%60 == 0 {
 				icons = win32.ListDesktopIcons()
 			}
 			iconTick++

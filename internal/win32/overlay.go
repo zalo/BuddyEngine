@@ -8,6 +8,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Window tracking cadence (shared with app.go's desktop loop).
+const DesktopTickMs = 33 // ~30Hz window rects for low-latency colliders
+
 const (
 	// GWL_EXSTYLE == -20, passed as a zero-extended 32-bit value; the API
 	// truncates it back to a signed int.
