@@ -24,6 +24,9 @@
     iframe.id = '__buddyengine_overlay';
     iframe.src = OVERLAY_URL + '?page=' + innerWidth + 'x' + innerHeight;
     iframe.setAttribute('aria-hidden', 'true');
+    // Delegate the power-governor signal (main.js caps to 30fps under CPU
+    // pressure); harmless where the page's own policy denies it.
+    iframe.setAttribute('allow', 'compute-pressure');
     const baseStyle =
         'position:fixed; border:none; background:transparent;' +
         'pointer-events:none; z-index:2147483646; color-scheme:normal;';

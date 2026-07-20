@@ -39,9 +39,12 @@ if (navigator.getBattery) {
 }
 if (typeof PressureObserver !== 'undefined') {
     try {
-        new PressureObserver((records) => {
+        // observe() returns a promise that rejects where permissions policy
+        // forbids compute-pressure (e.g. cross-origin iframes without an
+        // allow= delegation) — swallow it, the battery signal still works.
+        Promise.resolve(new PressureObserver((records) => {
             cpuPressure = records[records.length - 1].state;
-        }).observe('cpu');
+        }).observe('cpu')).catch(() => {});
     } catch (e) {}
 }
 function fpsCap() {
@@ -156,7 +159,7 @@ async function boot() {
             sim, desk, renderer, interact,
             pageW: desk.screenW / dpr,
             pageH: desk.screenH / dpr,
-            grid: 128, // WebView2 swapchain reallocation is pricier than a canvas resize
+            grid: 64,
             requestRect: (r) => window.go.main.App.SetOverlayRect(
                 Math.round(r.x * dpr), Math.round(r.y * dpr),
                 Math.round(r.w * dpr), Math.round(r.h * dpr)),

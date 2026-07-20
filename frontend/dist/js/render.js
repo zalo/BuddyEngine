@@ -75,6 +75,32 @@ export class Renderer {
         this.debugGroup.add(this.viewportOutline);
     }
 
+    // Debug rectangles for the per-body boxes feeding the form-fit union
+    // (cyan) — shows at a glance which buddy is inflating the window.
+    // Pooled LineLoops in the debug layer; pass [] to clear.
+    setDebugFitBoxes(boxes) {
+        this.fitBoxLines = this.fitBoxLines || [];
+        while (this.fitBoxLines.length < boxes.length) {
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(4 * 3), 3));
+            const line = new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color: 0x22ffdd }));
+            this.debugGroup.add(line);
+            this.fitBoxLines.push(line);
+        }
+        this.fitBoxLines.forEach((line, i) => {
+            if (i >= boxes.length) {
+                line.visible = false;
+                return;
+            }
+            const b = boxes[i];
+            const pos = line.geometry.attributes.position;
+            pos.array.set([b.x0, 0, b.z0, b.x1, 0, b.z0, b.x1, 0, b.z1, b.x0, 0, b.z1]);
+            pos.needsUpdate = true;
+            line.geometry.computeBoundingSphere();
+            line.visible = true;
+        });
+    }
+
     // Show a sub-rect of the desktop (physical px): resize the drawing
     // buffer to it and shift the ortho window so world content stays glued
     // to desktop coordinates. Call from a resize observer — i.e. after the

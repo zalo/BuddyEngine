@@ -1,41 +1,57 @@
 // Form-fit: keep the host window hugging the buddies' bounding box
-// (+ padding) instead of spanning the whole desktop/page, so empty
+// (+ margin) instead of spanning the whole desktop/page, so empty
 // transparent area stops paying compositor fillrate. Shared by the
 // WebExtension overlay (content script resizes our iframe) and the native
 // Windows overlay (Go moves the borderless window via SetWindowPos).
 //
-// The engine's world stays in full desktop/page coordinates; only the
-// rendered window moves. Because styling the window and this document
-// observing the new viewport are not synchronous, the camera/canvas (and
-// the DOM-view cell iframe counter-offsets) are applied from OUR resize
-// event — the same visual frame the new viewport appears in.
+// Fit: every body and articulation link contributes its actual bounding
+// radius (sim.hoverTargets) plus a small margin — not a flat per-body pad —
+// so the union tracks the buddies tightly. With debug colliders on, each
+// contributing box is drawn (cyan) so an outlier is easy to spot.
+//
+// Transition order (window hosts apply our rect asynchronously):
+//   frame N:   resize canvas + shift camera to the NEW rect, and CSS-shift
+//              the canvas by the rect delta so the world stays glued to the
+//              desktop inside the still-old window;
+//   frame N+1: ask the host to move/resize the window;
+//   adoption:  when our resize event shows the new size (or the next frame,
+//              for translation-only moves that fire no resize), drop the
+//              CSS shift and re-anchor the DOM-view cell iframes.
+// Camera first, window after — the scene never lags the window.
 
 export function startFormFit({
     sim, desk, renderer, interact,
     pageW, pageH,                 // full desktop/page size, CSS px
     requestRect,                  // (rectCss) => ask the host to move/resize the window
-    onRect = () => {},            // notified after a rect is actually applied
-    padM = 1.3,                   // meters around each body (view canvases, bubbles)
+    onRect = () => {},            // notified after a rect is fully adopted
+    marginM = 0.45,               // meters beyond each body's bounding radius
     grid = 64,                    // quantize so resizes are rare
     minW = 320, minH = 280,       // menu + a buddy always fit
     intervalMs = 150,
 }) {
     const DPR = window.devicePixelRatio || 1;
+    const canvasEl = renderer.renderer.domElement;
     const cur = { x: 0, y: 0, w: pageW, h: pageH };
     let pending = null;
     let pendingAt = 0;
 
     function fitRect() {
-        const snap = sim.snapshotBodies();
-        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, n = 0;
-        snap.ids.forEach((id, i) => {
-            if (id === 'sys/target') return; // tracks the cursor, not a buddy
-            const x = snap.buf[i * 13], z = snap.buf[i * 13 + 2];
-            x0 = Math.min(x0, x - padM); x1 = Math.max(x1, x + padM);
-            z0 = Math.min(z0, z - padM); z1 = Math.max(z1, z + padM);
-            n++;
-        });
-        if (!n) return { x: 0, y: 0, w: pageW, h: pageH };
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        const boxes = [];
+        for (const t of sim.hoverTargets()) {
+            if (t.id.startsWith('sys/')) continue;
+            let px, pz;
+            try {
+                const p = t.actor.getGlobalPose().get_p();
+                px = p.get_x(); pz = p.get_z();
+            } catch (e) { continue; }
+            const r = (t.radius || 0.1) + marginM;
+            boxes.push({ x0: px - r, z0: pz - r, x1: px + r, z1: pz + r });
+            x0 = Math.min(x0, px - r); x1 = Math.max(x1, px + r);
+            z0 = Math.min(z0, pz - r); z1 = Math.max(z1, pz + r);
+        }
+        renderer.setDebugFitBoxes(renderer.debugGroup.visible ? boxes : []);
+        if (!boxes.length) return { x: 0, y: 0, w: pageW, h: pageH };
         // world -> CSS px (y flips: high z = small y)
         const tl = desk.toScreen(x0, z1), br = desk.toScreen(x1, z0);
         let rx = tl.x / DPR, ry = tl.y / DPR, rw = br.x / DPR - rx, rh = br.y / DPR - ry;
@@ -64,17 +80,31 @@ export function startFormFit({
         }
     }
 
-    function applyRect(r) {
-        cur.x = r.x; cur.y = r.y; cur.w = r.w; cur.h = r.h;
+    // Phase 1: camera + canvas now, glued into the still-old window.
+    function beginTransition(r) {
         renderer.setViewportRect(r.x * DPR, r.y * DPR, r.w * DPR, r.h * DPR);
+        canvasEl.style.transform = `translate(${r.x - cur.x}px, ${r.y - cur.y}px)`;
+    }
+
+    // Phase 2 complete: the window is at r.
+    function finalize(r) {
+        cur.x = r.x; cur.y = r.y; cur.w = r.w; cur.h = r.h;
+        canvasEl.style.transform = '';
         offsetCellIframes();
         onRect({ ...cur });
+        pending = null;
+    }
+
+    // The host never applied the rect: put the camera back.
+    function rollback() {
+        renderer.setViewportRect(cur.x * DPR, cur.y * DPR, cur.w * DPR, cur.h * DPR);
+        canvasEl.style.transform = '';
+        pending = null;
     }
 
     const onResize = () => {
         if (pending && Math.abs(innerWidth - pending.w) <= 2 && Math.abs(innerHeight - pending.h) <= 2) {
-            applyRect(pending);
-            pending = null;
+            finalize(pending);
         }
     };
     window.addEventListener('resize', onResize);
@@ -88,14 +118,14 @@ export function startFormFit({
 
     const timer = setInterval(() => {
         if (pending && performance.now() - pendingAt > 400) {
-            // No resize event arrived. Either the host missed the request
-            // (retry below), or the window was ALREADY at this size — e.g.
-            // a native frontend reload into a still-fitted window — in
-            // which case adopt it now.
+            // No resize event arrived. Either the window was already at this
+            // size (native frontend reload into a fitted overlay) — adopt —
+            // or the host missed the request — roll the camera back.
             if (Math.abs(innerWidth - pending.w) <= 2 && Math.abs(innerHeight - pending.h) <= 2) {
-                applyRect(pending);
+                finalize(pending);
+            } else {
+                rollback();
             }
-            pending = null;
         }
         if (pending) return;
         const r = fitRect();
@@ -106,14 +136,16 @@ export function startFormFit({
         const sameSize = r.w === cur.w && r.h === cur.h;
         pending = r;
         pendingAt = performance.now();
-        try { requestRect(r); } catch (e) { pending = null; return; }
-        if (sameSize) {
-            // Pure translation: the viewport dimensions don't change, so no
-            // resize event will ever fire — apply immediately (the padding
-            // hides the sub-frame skew between window move and camera pan).
-            applyRect(r);
-            pending = null;
-        }
+        beginTransition(r);
+        requestAnimationFrame(() => {
+            if (pending !== r) return;
+            try { requestRect(r); } catch (e) { rollback(); return; }
+            if (sameSize) {
+                // Translation-only: no resize event will ever fire; the host
+                // applies within a frame.
+                requestAnimationFrame(() => { if (pending === r) finalize(r); });
+            }
+        });
     }, intervalMs);
 
     return {
@@ -121,6 +153,7 @@ export function startFormFit({
         stop() {
             clearInterval(timer);
             window.removeEventListener('resize', onResize);
+            renderer.setDebugFitBoxes([]);
         },
     };
 }
