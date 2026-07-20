@@ -17,8 +17,8 @@ jobs:
   windows:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: 'stable'
       - name: Install wails CLI
@@ -31,7 +31,7 @@ jobs:
           cp build/bin/BuddyEngine.exe _dist/
           rsync -a --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
             --exclude='native/' workshop _dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BuddyEngine-windows
           path: _dist
@@ -39,8 +39,8 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: 'stable'
       - name: Install webview dependencies
@@ -58,7 +58,7 @@ jobs:
           rsync -a --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
             --exclude='native/' workshop _dist/
           tar -czf BuddyEngine-linux.tar.gz -C _dist .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BuddyEngine-linux
           path: BuddyEngine-linux.tar.gz
@@ -66,8 +66,8 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: 'stable'
       - name: Install wails CLI
@@ -81,7 +81,7 @@ jobs:
             build/bin/BuddyEngine.app/Contents/Resources/
       - name: Zip .app bundle
         run: ditto -c -k --keepParent build/bin/BuddyEngine.app build/bin/BuddyEngine.app.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BuddyEngine-macos
           path: build/bin/BuddyEngine.app.zip
