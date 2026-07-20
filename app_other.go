@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -8,7 +10,7 @@ import (
 	"buddyengine/internal/workshop"
 )
 
-// App on Linux: no desktop overlay integration (that's Win32 territory) —
+// App on Linux/macOS: no desktop overlay integration (that's Win32 territory) —
 // the app runs as a normal window showing the stand-in XP desktop
 // (web.html, served as the index by main_linux.go). Packs still load from
 // the real workshop folder next to the binary; input and window platforms
@@ -47,3 +49,7 @@ func (a *App) GetBootstrap() Bootstrap {
 
 // SetClickThrough is a no-op in a normal window.
 func (a *App) SetClickThrough(enabled bool) {}
+
+// SetOverlayRect is a no-op in a normal window (Bootstrap.Overlay is false,
+// so the frontend never starts the native form-fit loop here).
+func (a *App) SetOverlayRect(x, y, w, h int) {}

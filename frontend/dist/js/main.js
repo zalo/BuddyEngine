@@ -144,6 +144,25 @@ async function boot() {
     // Host-page debug handle (no pack code ever runs in this context).
     window.buddyDebug = { sim, desk, renderer, interact, cartMgr };
 
+    // Native overlay form-fit: the Windows build moves/resizes the
+    // borderless overlay window (SetWindowPos via the SetOverlayRect
+    // binding) to the buddies' bounding box — the DWM stops compositing a
+    // whole screen of empty transparency. Input is unaffected: the cursor
+    // stream is global, and colliders are in full-desktop coordinates.
+    if (bootstrap.overlay && window.go.main.App.SetOverlayRect) {
+        const dpr = window.devicePixelRatio || 1;
+        const { startFormFit } = await import('./formfit.js');
+        startFormFit({
+            sim, desk, renderer, interact,
+            pageW: desk.screenW / dpr,
+            pageH: desk.screenH / dpr,
+            grid: 128, // WebView2 swapchain reallocation is pricier than a canvas resize
+            requestRect: (r) => window.go.main.App.SetOverlayRect(
+                Math.round(r.x * dpr), Math.round(r.y * dpr),
+                Math.round(r.w * dpr), Math.round(r.h * dpr)),
+        });
+    }
+
     document.getElementById('overlay').style.display = 'none';
     running = true;
     lastSimTimestamp = performance.now();

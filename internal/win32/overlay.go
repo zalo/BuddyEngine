@@ -37,6 +37,10 @@ type Overlay struct {
 	hwnd         uintptr
 	mu           sync.Mutex
 	clickThrough bool
+	// Form-fit rect (physical px). Zero size = span the full screen. The
+	// frontend keeps this hugging the buddies' bounding box so the DWM
+	// stops compositing a screen of empty transparency.
+	rx, ry, rw, rh int32
 }
 
 // NewOverlay locates the window by title.
@@ -71,9 +75,7 @@ func (o *Overlay) Apply() {
 	procSetWindowLongPtrW.Call(o.hwnd, gwlExStyle, newEx)
 	procShowWindow.Call(o.hwnd, swShowNA)
 
-	w, h := PrimaryScreenSize()
-	procSetWindowPos.Call(o.hwnd, hwndTopmost, 0, 0, uintptr(w), uintptr(h),
-		swpNoActivate|swpShowWindow)
+	o.applyRectLocked()
 }
 
 // RefreshTaskbarState re-asserts the tool-window style with a hide/show
@@ -87,8 +89,26 @@ func (o *Overlay) RefreshTaskbarState() {
 	procShowWindow.Call(o.hwnd, swHide)
 	procSetWindowLongPtrW.Call(o.hwnd, gwlExStyle, (ex|wsExToolWindow)&^uintptr(wsExAppWindow))
 	procShowWindow.Call(o.hwnd, swShowNA)
-	w, h := PrimaryScreenSize()
-	procSetWindowPos.Call(o.hwnd, hwndTopmost, 0, 0, uintptr(w), uintptr(h),
+	o.applyRectLocked()
+}
+
+// SetRect moves/resizes the overlay window (physical px) — the form-fit
+// path. Keeps topmost + no-activate so following the buddies around never
+// steals focus.
+func (o *Overlay) SetRect(x, y, w, h int32) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.rx, o.ry, o.rw, o.rh = x, y, w, h
+	o.applyRectLocked()
+}
+
+func (o *Overlay) applyRectLocked() {
+	x, y, w, h := o.rx, o.ry, o.rw, o.rh
+	if w <= 0 || h <= 0 {
+		x, y = 0, 0
+		w, h = PrimaryScreenSize()
+	}
+	procSetWindowPos.Call(o.hwnd, hwndTopmost, uintptr(x), uintptr(y), uintptr(w), uintptr(h),
 		swpNoActivate|swpShowWindow)
 }
 

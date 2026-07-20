@@ -144,6 +144,7 @@ func (a *App) GetBootstrap() Bootstrap {
 		WorkBottom: wb,
 		Packs:      a.shop.List(),
 		Steam:      a.shop.SteamActive(),
+		Overlay:    true,
 	}
 }
 
@@ -151,5 +152,14 @@ func (a *App) GetBootstrap() Bootstrap {
 func (a *App) SetClickThrough(enabled bool) {
 	if a.overlay != nil {
 		a.overlay.SetClickThrough(enabled)
+	}
+}
+
+// SetOverlayRect form-fits the overlay window to a desktop rect (physical
+// px) — the frontend keeps it hugging the buddies' bounding box. Zero size
+// restores fullscreen.
+func (a *App) SetOverlayRect(x, y, w, h int) {
+	if a.overlay != nil {
+		a.overlay.SetRect(int32(x), int32(y), int32(w), int32(h))
 	}
 }

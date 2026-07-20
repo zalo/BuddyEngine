@@ -30,6 +30,7 @@ type Bootstrap struct {
 	WorkBottom int32               `json:"workBottom"`
 	Packs      []workshop.PackInfo `json:"packs"`
 	Steam      bool                `json:"steam"`
+	Overlay    bool                `json:"overlay"` // true = desktop overlay window that supports SetOverlayRect form-fitting
 }
 
 // watchdogLoop reloads the frontend if its heartbeat stops (unhandled JS

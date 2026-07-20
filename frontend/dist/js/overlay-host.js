@@ -165,98 +165,25 @@ const layerCanvas = setInterval(() => {
     try { parent.postMessage({ t: 'be.ready' }, '*'); } catch (e) {}
 }, 50);
 
-// ---------------------------------------------------------------------------
-// Form-fit: keep the iframe hugging the buddies (+ padding) instead of
-// covering the page, to cut compositor fillrate over empty transparency.
-// Flow: compute bbox -> ask the parent to resize us (be.viewport) -> apply
-// the camera/canvas + cell-iframe offsets only when OUR resize event fires,
-// so the ortho window updates in the same visual frame as the new viewport
-// (styling the iframe and the child observing it are not synchronous).
-// ---------------------------------------------------------------------------
+// Form-fit (shared logic in formfit.js): keep the iframe hugging the
+// buddies instead of covering the page; the parent applies be.viewport
+// rects, and the module applies camera + cell-iframe offsets on our own
+// resize event. Started once the engine handles exist.
 if (EMBEDDED) {
-    const PAD_M = 1.3;          // meters around each body (covers view canvases, bubbles)
-    const GRID = 64;            // quantize the rect so resizes are rare
-    const MIN_W = 320, MIN_H = 280;
-    let pending = null;         // rect requested from the parent, not yet observed
-    let pendingAt = 0;
-
-    function fitRect() {
+    const { startFormFit } = await import('./formfit.js');
+    const waitBoot = setInterval(() => {
         const dbg = window.buddyDebug;
-        if (!dbg) return null;
-        const snap = dbg.sim.snapshotBodies();
-        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, n = 0;
-        snap.ids.forEach((id, i) => {
-            if (id === 'sys/target') return;
-            const x = snap.buf[i * 13], z = snap.buf[i * 13 + 2];
-            x0 = Math.min(x0, x - PAD_M); x1 = Math.max(x1, x + PAD_M);
-            z0 = Math.min(z0, z - PAD_M); z1 = Math.max(z1, z + PAD_M);
-            n++;
+        if (!dbg) return;
+        clearInterval(waitBoot);
+        startFormFit({
+            sim: dbg.sim,
+            desk: dbg.desk,
+            renderer: dbg.renderer,
+            interact: dbg.interact,
+            pageW: PAGE_W,
+            pageH: PAGE_H,
+            requestRect: (r) => parent.postMessage({ t: 'be.viewport', ...r }, '*'),
+            onRect: (r) => { curRect.x = r.x; curRect.y = r.y; curRect.w = r.w; curRect.h = r.h; },
         });
-        if (!n) return { x: 0, y: 0, w: PAGE_W, h: PAGE_H };
-        // world -> page CSS px (y flips: high z = small y)
-        const tl = dbg.desk.toScreen(x0, z1), br = dbg.desk.toScreen(x1, z0);
-        let rx = tl.x / DPR, ry = tl.y / DPR, rw = br.x / DPR - rx, rh = br.y / DPR - ry;
-        // outward-quantize, clamp to the page, enforce a working minimum
-        rx = Math.floor(rx / GRID) * GRID;
-        ry = Math.floor(ry / GRID) * GRID;
-        rw = Math.ceil((rw + GRID) / GRID) * GRID;
-        rh = Math.ceil((rh + GRID) / GRID) * GRID;
-        rw = Math.max(rw, MIN_W); rh = Math.max(rh, MIN_H);
-        rx = Math.max(0, Math.min(rx, PAGE_W - rw));
-        ry = Math.max(0, Math.min(ry, PAGE_H - rh));
-        rw = Math.min(rw, PAGE_W - rx); rh = Math.min(rh, PAGE_H - ry);
-        return { x: rx, y: ry, w: rw, h: rh };
-    }
-
-    function offsetCellIframes() {
-        // DOM-view cells position content in page coords; counter-shift
-        // their (page-sized) iframes so their pixels stay put on the page.
-        for (const f of document.querySelectorAll('body > iframe')) {
-            if (f.style.display === 'none') continue;
-            const s = f.style;
-            s.width = PAGE_W + 'px';
-            s.height = PAGE_H + 'px';
-            s.inset = 'auto';
-            s.left = -curRect.x + 'px';
-            s.top = -curRect.y + 'px';
-        }
-    }
-
-    function applyRect(r) {
-        curRect.x = r.x; curRect.y = r.y; curRect.w = r.w; curRect.h = r.h;
-        const dbg = window.buddyDebug;
-        if (dbg) dbg.renderer.setViewportRect(r.x * DPR, r.y * DPR, r.w * DPR, r.h * DPR);
-        offsetCellIframes();
-    }
-
-    window.addEventListener('resize', () => {
-        if (pending && Math.abs(innerWidth - pending.w) <= 2 && Math.abs(innerHeight - pending.h) <= 2) {
-            applyRect(pending);
-            pending = null;
-        }
-    });
-
-    // Right-click menu positions come from page-space cursor coords; the
-    // menu itself lives in window space.
-    const hookMenu = setInterval(() => {
-        const dbg = window.buddyDebug;
-        if (!dbg || !dbg.interact.onRightClick) return;
-        clearInterval(hookMenu);
-        const orig = dbg.interact.onRightClick;
-        dbg.interact.onRightClick = (cssX, cssY) => orig(cssX - curRect.x, cssY - curRect.y);
     }, 200);
-
-    setInterval(() => {
-        if (pending && performance.now() - pendingAt > 400) pending = null; // parent missed it; retry
-        if (pending) return;
-        const r = fitRect();
-        if (!r) return;
-        if (r.x === curRect.x && r.y === curRect.y && r.w === curRect.w && r.h === curRect.h) {
-            offsetCellIframes(); // late view.show may have reset styles
-            return;
-        }
-        pending = r;
-        pendingAt = performance.now();
-        try { parent.postMessage({ t: 'be.viewport', ...r }, '*'); } catch (e) { pending = null; }
-    }, 150);
 }

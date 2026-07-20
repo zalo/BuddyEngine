@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -7,7 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
-// Linux runs as a normal window with the stand-in XP desktop: serve
+// Non-Windows platforms run as a normal window with the stand-in XP desktop: serve
 // web.html (the web-host entry) as the index. The web host shim detects
 // the real Wails bindings and loads packs from the workshop folder on disk
 // while taking input and window platforms from the DOM.
