@@ -56,6 +56,12 @@ class Cell {
         this.ready = false;
         this.booted = false;  // pack main fully evaluated (or failed)
         this.dead = false;
+        this.instanced = false;      // pack registered Buddy.instances()
+        this.instances = new Set();  // live instance iids (instanced packs)
+        this.nextIid = 1;
+        this.perf = null;            // latest {avg, worst, instances, at}
+        this.optionsSchema = null;   // pack-exposed adjustable options
+        this.optionValues = {};
         this.spawnedAt = performance.now();
         this.pendingPhys = [];
         this.inbox = [];        // bus messages queued for next frame
@@ -236,7 +242,44 @@ export class CartridgeManager {
                 break;
             case OPS.BOOTED:
                 cell.booted = true;
+                // Instanced packs render nothing until an instance exists —
+                // create the first one.
+                if (cell.instanced && cell.instances.size === 0) {
+                    this.addInstanceToCell(cell);
+                }
                 break;
+            case OPS.CAPS:
+                cell.instanced = !!c.instanced;
+                if (cell.booted && cell.instances.size === 0) {
+                    this.addInstanceToCell(cell);
+                }
+                break;
+            case OPS.PERF:
+                cell.perf = {
+                    avg: +c.avg || 0,
+                    worst: +c.worst || 0,
+                    instances: +c.instances || 1,
+                    at: performance.now(),
+                };
+                break;
+            case OPS.OPTIONS: {
+                // Sanitize: plain data only, bounded sizes.
+                const schema = {};
+                const entries = Object.entries(c.schema || {}).slice(0, 16);
+                for (const [key, o] of entries) {
+                    if (!/^[\w.-]{1,32}$/.test(key) || !o) continue;
+                    schema[key] = {
+                        label: String(o.label || key).slice(0, 48),
+                        type: ['range', 'toggle', 'select'].includes(o.type) ? o.type : 'toggle',
+                        value: o.value,
+                        min: +o.min || 0, max: +o.max || 1, step: +o.step || 0.01,
+                        choices: Array.isArray(o.choices) ? o.choices.slice(0, 12).map(s => String(s).slice(0, 32)) : undefined,
+                    };
+                    cell.optionValues[key] = o.value;
+                }
+                cell.optionsSchema = schema;
+                break;
+            }
             case OPS.LOG:
                 this.log(`[${cell.id} ${cell.name}] ${String(c.msg).slice(0, 500)}`);
                 break;
@@ -358,6 +401,54 @@ export class CartridgeManager {
             default:
                 throw new Error('unknown op');
         }
+    }
+
+    // ---- instancing -------------------------------------------------------
+    // Add an instance to an instanced cell. spawn: {x?, z?, dragged?}.
+    addInstanceToCell(cell, spawn) {
+        const iid = cell.nextIid++;
+        cell.instances.add(iid);
+        cell.iframe.contentWindow.postMessage({ t: 'inst', op: 'add', iid, spawn: spawn || {} }, '*');
+        return iid;
+    }
+
+    // Spawn one more instance of a pack. Instanced packs share their cell;
+    // legacy packs fall back to one cell per instance. Returns
+    // {cellId, iid|null} (iid null = cell-as-instance), or a promise of it.
+    async spawnInstance(packId, spawn) {
+        for (const cell of this.cells.values()) {
+            if (cell.pack.id === packId && cell.instanced && !cell.dead) {
+                return { cellId: cell.id, iid: this.addInstanceToCell(cell, spawn) };
+            }
+        }
+        // No instanced cell yet: if a cell of this pack exists but is
+        // legacy, spawn a sibling cell; if none exists at all, spawn one.
+        const cellId = await this.spawn({ id: packId, name: packId });
+        const cell = this.cells.get(cellId);
+        if (cell) cell.pendingSpawnHint = spawn || null; // future use by packs
+        return { cellId, iid: null };
+    }
+
+    // Destroy one instance (or a whole legacy cell).
+    destroyInstance(cellId, iid) {
+        const cell = this.cells.get(cellId);
+        if (!cell) return;
+        if (iid != null && cell.instanced) {
+            cell.instances.delete(iid);
+            if (!cell.dead) {
+                cell.iframe.contentWindow.postMessage({ t: 'inst', op: 'remove', iid }, '*');
+            }
+        } else {
+            cell.kill('despawned');
+        }
+    }
+
+    // Push an option value change into a cell.
+    setCellOption(cellId, key, value) {
+        const cell = this.cells.get(cellId);
+        if (!cell || cell.dead) return;
+        cell.optionValues[key] = value;
+        cell.iframe.contentWindow.postMessage({ t: 'options.set', key, value }, '*');
     }
 
     // Queue a pointer event for the owning cell of a body fqid.

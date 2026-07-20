@@ -31,8 +31,7 @@ render loop — waiting for `loaded` while hidden deadlocks.
 - `l2d.min.js` — [l2d](https://github.com/hacxy/l2d) v2 by Hacxy, MIT.
   Bundles the Live2D Cubism cores; use of the Cubism SDK is subject to the
   [Live2D Proprietary Software License](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html).
-- `model/` — **Hiyori Momose**, official Live2D Inc. sample model
-  (from [CubismWebSamples](https://github.com/Live2D/CubismWebSamples)),
+- `model/` — **wanko_touch** ("touch dog"), Live2D Inc. sample material,
   provided under the
   [Live2D Free Material License](https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html).
   Sample data for demonstration; not for standalone redistribution.

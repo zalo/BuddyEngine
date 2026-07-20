@@ -28,6 +28,13 @@ export function startFormFit({
     grid = 64,                    // quantize so resizes are rare
     minW = 160, minH = 100,       // content-scale floor; the menu gets its own boost
     intervalMs = 150,
+    // glue=true: hold the OLD framing (CSS-shifted) until the host's window
+    // change is observed — right for iframe hosts, whose parent applies
+    // styles synchronously with our paints. glue=false: paint the NEW
+    // framing immediately and let the window catch up next frame — right
+    // for OS windows (DWM presents our frames and the window move on its
+    // own schedule; holding old framing reads as the scene lagging).
+    glue = true,
 }) {
     const DPR = window.devicePixelRatio || 1;
     const canvasEl = renderer.renderer.domElement;
@@ -87,8 +94,16 @@ export function startFormFit({
         // bobbing doesn't churn; on the ground it clamps to the taskbar
         // line exactly); only the top edge uses the coarse grid, so slack
         // becomes jump headroom instead of dead space below the feet.
-        const yBottom = Math.min(Math.ceil(br.y / DPR / 16) * 16, maxY);
+        let yBottom = Math.min(Math.ceil(br.y / DPR / 16) * 16, maxY);
         let ry = Math.floor(tl.y / DPR / grid) * grid;
+        // Open host-UI panels (toybox/profiler) are part of the window.
+        const ui = (window.buddyUI && window.buddyUI.rects()) || [];
+        for (const u of ui) {
+            rx = Math.min(rx, Math.max(0, Math.floor(u.x / grid) * grid));
+            rRight = Math.max(rRight, Math.min(pageW, Math.ceil((u.x + u.w) / grid) * grid));
+            ry = Math.min(ry, Math.max(0, Math.floor(u.y / grid) * grid));
+            yBottom = Math.max(yBottom, Math.min(maxY, Math.ceil((u.y + u.h + 8) / 16) * 16));
+        }
         if (yBottom - ry < minH) ry = yBottom - minH;
         ry = Math.max(0, ry);
         return { x: rx, y: ry, w: rRight - rx, h: Math.max(1, Math.round(yBottom - ry)) };
@@ -96,22 +111,28 @@ export function startFormFit({
 
     // DOM-view cells position content in desktop/page coords; counter-shift
     // their (page-sized) iframes so their pixels stay put.
-    function offsetCellIframes() {
+    function offsetCellIframes(rect = cur) {
         for (const f of document.querySelectorAll('body > iframe')) {
             if (f.style.display === 'none') continue;
             const s = f.style;
             s.width = pageW + 'px';
             s.height = pageH + 'px';
             s.inset = 'auto'; // shorthand resets left/top — clear before setting
-            s.left = -cur.x + 'px';
-            s.top = -cur.y + 'px';
+            s.left = -rect.x + 'px';
+            s.top = -rect.y + 'px';
         }
     }
 
-    // Phase 1: camera + canvas now, glued into the still-old window.
+    // Phase 1: camera + canvas now. Glue mode keeps it LOOKING like the old
+    // window until the change is observed; no-glue paints the new framing
+    // immediately so content leads the window.
     function beginTransition(r) {
         renderer.setViewportRect(r.x * DPR, r.y * DPR, r.w * DPR, r.h * DPR);
-        canvasEl.style.transform = `translate(${r.x - cur.x}px, ${r.y - cur.y}px)`;
+        if (glue) {
+            canvasEl.style.transform = `translate(${r.x - cur.x}px, ${r.y - cur.y}px)`;
+        } else {
+            offsetCellIframes(r);
+        }
     }
 
     // Phase 2 complete: the window is at r.
@@ -128,6 +149,7 @@ export function startFormFit({
         cur.x = r.x; cur.y = r.y; cur.w = r.w; cur.h = r.h;
         canvasEl.style.transform = '';
         offsetCellIframes();
+        if (window.buddyUI) window.buddyUI.reposition({ x: cur.x, y: cur.y });
         onRect({ ...cur });
         pending = null;
     }
@@ -136,6 +158,7 @@ export function startFormFit({
     function rollback() {
         renderer.setViewportRect(cur.x * DPR, cur.y * DPR, cur.w * DPR, cur.h * DPR);
         canvasEl.style.transform = '';
+        if (!glue) offsetCellIframes(cur);
         pending = null;
     }
 

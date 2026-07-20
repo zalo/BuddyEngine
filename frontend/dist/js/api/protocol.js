@@ -97,6 +97,9 @@ export const OPS = {
     BUS_SEND: 'bus.send',           // {to:'b<N>'|'*', topic, data} — data is structured-clone JSON
     READY: 'ready',                 // {} — first command a cell must send
     BOOTED: 'booted',               // {} — sent by the harness once the pack module finished evaluating (or failed); spawn staggering waits on it
+    CAPS: 'caps',                   // {instanced?} — pack capabilities (Buddy.instances registered)
+    PERF: 'perf',                   // {avg, worst, instances} — cell-reported main-thread ms per frame
+    OPTIONS: 'options',             // {schema} — adjustable options for the host's sidebar; host replies with {t:'options.set', key, value}
     LOG: 'log',                     // {msg}
     META: 'meta',                   // {name?, description?, author?, version?} — relayed from the pack's `export const meta`
 };

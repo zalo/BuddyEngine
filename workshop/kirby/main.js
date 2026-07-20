@@ -157,15 +157,29 @@ for (const k of Object.keys(ANIM)) {
 }
 buddy.log('anims: ' + Object.entries(ANIM).map(([k, a]) => k + ':' + a.frames.length).join(' '));
 
+
+// ---------------------------------------------------------------------------
+// Instances: every Kirby below lives in this one cell. Textures/clips above
+// are shared; body, sprite and the whole behavior state are per instance.
+// ---------------------------------------------------------------------------
+Buddy.instances((inst) => {
+const myPrefix = inst.bodyId('');
+// Perception granularity: sibling instances count as distinct buddies.
+const ownerKeyOf = (id) => {
+    const m = id.match(/^([^/]+\/i\d+)\./);
+    return m ? m[1] : id.split('/')[0];
+};
+const myKey = ownerKeyOf(inst.bodyId('body'));
+
 // ---------------------------------------------------------------------------
 // Body + billboard
 // ---------------------------------------------------------------------------
 const R = 0.19;
 const MASS = 0.35;
 const G = 9.81;
-const ball = buddy.phys.spawn('body', {
+const ball = inst.phys.spawn('body', {
     shape: { type: 'sphere', r: R },
-    pos: [-3.5, 0, 1.0],
+    pos: [inst.spawn.x !== undefined ? inst.spawn.x : -3.5 + (inst.iid % 5), 0, inst.spawn.z !== undefined ? Math.max(inst.spawn.z, R + 0.05) : 1.0],
     mass: MASS,
     friction: 0.6,
     restitution: 0.35,
@@ -177,8 +191,8 @@ const ball = buddy.phys.spawn('body', {
 // Pixel-constant scale: a native texel is M_PER_PX meters on screen, every
 // frame renders at its true pixel size (no zoom pumping between frames).
 const M_PER_PX = 0.55 / 26; // Kirby's ~26px body -> 0.55m on screen
-buddy.gfx.geometry('quad', { type: 'plane', params: { w: 1, h: 1 } }); // unit; scaled per frame
-buddy.gfx.material('sprite', {
+inst.gfx.geometry('quad', { type: 'plane', params: { w: 1, h: 1 } }); // unit; scaled per frame
+inst.gfx.material('sprite', {
     type: 'shader',
     transparent: true,
     depthWrite: false,
@@ -203,7 +217,7 @@ buddy.gfx.material('sprite', {
             gl_FragColor = c;
         }`,
 });
-const sprite = buddy.gfx.mesh('sprite', { geo: 'quad', mat: 'sprite' });
+const sprite = inst.gfx.mesh('sprite', { geo: 'quad', mat: 'sprite' });
 sprite.attach('body', [0, 0, 0], [0.7071, 0, 0, 0.7071]);
 
 // ---------------------------------------------------------------------------
@@ -292,11 +306,11 @@ let cheerUntil = 0, surpriseUntil = 0, nomUntil = 0, puffedUntil = 0;
 let playCooldownUntil = 0;
 let poi = null;           // {x, z, t} point of interest from bus chatter
 const greetQueue = [];    // newly spawned buddies to go say hi to
-const knownOwners = new Set(['sys', buddy.id]);
+const knownOwners = new Set(['sys', 'sys/target', myKey]);
 const busInbox = [];
 
 function setMode(m, data = {}) {
-    if (mode !== m) buddy.log('mode: ' + mode + ' -> ' + m);
+    if (mode !== m) inst.log('mode: ' + mode + ' -> ' + m);
     mode = m;
     modeT = 0;
     md = data;
@@ -376,8 +390,8 @@ buddy.bus.on('sys.reset', () => {
 // ---------------------------------------------------------------------------
 // The frame loop
 // ---------------------------------------------------------------------------
-buddy.onFrame((world) => {
-    const me = world.bodies.get(buddy.id + '/body');
+inst.onFrame((world) => {
+    const me = world.bodies.get(inst.bodyId('body'));
     if (!me) return;
     const dt = world.dt;
     worldTime = world.time;
@@ -407,7 +421,7 @@ buddy.onFrame((world) => {
     // -- perception -----------------------------------------------------------
     const s = { wisp: null, sword: null, pelvis: null, dWisp: Infinity, dPelvis: Infinity, pelvisSpeed: 0, swordThreat: 0, hunted: false };
     for (const [id, b] of world.bodies) {
-        if (id.startsWith(buddy.id + '/')) continue;
+        if (id.startsWith(myPrefix)) continue;
         if (!s.wisp && id.endsWith('/ball')) s.wisp = b;
         if (id.endsWith('.sword')) s.sword = b;
         if (id.endsWith('.pelvis')) s.pelvis = b;
@@ -434,7 +448,7 @@ buddy.onFrame((world) => {
     if (world.time - lastOwnerScan > 1.5) {
         lastOwnerScan = world.time;
         for (const [id] of world.bodies) {
-            const owner = id.split('/')[0];
+            const owner = ownerKeyOf(id);
             if (knownOwners.has(owner)) continue;
             knownOwners.add(owner); // first body per owner is its root
             if (world.time > 6) greetQueue.push({ owner, bodyId: id });
@@ -661,7 +675,7 @@ buddy.onFrame((world) => {
             let disturbed = md.disturbed;
             if (dCursor < 1.1) disturbed = true;
             for (const [id, b] of world.bodies) {
-                if (id.startsWith(buddy.id + '/') || id === 'sys/target') continue;
+                if (id.startsWith(myPrefix) || id === 'sys/target') continue;
                 if (Math.hypot(b.pos[0] - x, b.pos[2] - z) < 1.0 &&
                     Math.hypot(b.vel[0], b.vel[2]) > 2.5) { disturbed = true; break; }
             }
@@ -718,4 +732,8 @@ buddy.onFrame((world) => {
     tickAnim(dt);
 });
 
-buddy.log('kirby online, poyo');
+
+
+});
+
+buddy.log('kirby cell online, poyo');

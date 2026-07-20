@@ -147,6 +147,14 @@ async function boot() {
     // Host-page debug handle (no pack code ever runs in this context).
     window.buddyDebug = { sim, desk, renderer, interact, cartMgr };
 
+    // Host-UI meta buddies: toybox (spawn/despawn/options) + profiler.
+    try {
+        const { initPanels } = await import('./panels.js');
+        initPanels({ cartMgr, interact, desk, sim, renderer });
+    } catch (e) {
+        logToBackend('panels init failed: ' + e.message);
+    }
+
     // Native overlay form-fit: the Windows build moves/resizes the
     // borderless overlay window (SetWindowPos via the SetOverlayRect
     // binding) to the buddies' bounding box — the DWM stops compositing a
@@ -160,6 +168,7 @@ async function boot() {
             pageW: desk.screenW / dpr,
             pageH: desk.screenH / dpr,
             grid: 64,
+            glue: false, // OS window: paint the new framing first, window follows
             requestRect: (r) => window.go.main.App.SetOverlayRect(
                 Math.round(r.x * dpr), Math.round(r.y * dpr),
                 Math.round(r.w * dpr), Math.round(r.h * dpr)),

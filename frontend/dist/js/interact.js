@@ -31,6 +31,30 @@ export class Interact {
         this.clickThrough = true; // overlay starts click-through
 
         this.onRightClick = null; // (cssX, cssY) => void
+
+        // Host UI (toybox/profiler panels): while the cursor is over a
+        // panel, don't grab buddies through it, and keep the window
+        // interactive (not click-through).
+        this.uiHover = false;
+    }
+
+    // Programmatic grab (toybox drag-spawn): the buddy is born already held.
+    // Released by the normal pointer-up path.
+    beginDrag(fqid) {
+        for (const t of this.sim.hoverTargets()) {
+            if (t.id === fqid) {
+                this.dragging = true;
+                this.dragBody = t.actor;
+                this.dragLocal = [0, 0, 0];
+                return true;
+            }
+        }
+        return false;
+    }
+
+    endDrag() {
+        this.dragging = false;
+        this.dragBody = null;
     }
 
     updateCursor(c) {
@@ -90,7 +114,7 @@ export class Interact {
             if (lEdgeUp && this.lastHoverId) this.cartMgr.routePointerEvent(this.lastHoverId, 'pointerup', cw.x, cw.z);
         }
 
-        if (lEdgeDown && hit && !this.menuOpen) {
+        if (lEdgeDown && hit && !this.menuOpen && !this.uiHover) {
             this.dragging = true;
             this.dragBody = hit.actor;
             // Grab point: keep it simple, grab the body origin.
@@ -112,7 +136,7 @@ export class Interact {
     }
 
     syncClickThrough() {
-        const wantInteractive = this.hovering || this.dragging || this.menuOpen;
+        const wantInteractive = this.hovering || this.dragging || this.menuOpen || this.uiHover;
         const wantClickThrough = !wantInteractive;
         if (wantClickThrough !== this.clickThrough) {
             this.clickThrough = wantClickThrough;
