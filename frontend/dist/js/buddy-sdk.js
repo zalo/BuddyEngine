@@ -216,8 +216,9 @@ const buddy = {
 function makeInstanceFacade(iid, spawn) {
     const pref = 'i' + iid + '.';
     const P = (id) => typeof id === 'string' && id.startsWith('$') ? id.slice(1) : pref + id;
-    // Body refs may be foreign fq ids ('sys/…', 'b2/…') — leave those alone.
-    const PB = (id) => (typeof id === 'string' && id.includes('/')) ? id : P(id);
+    // Body refs may be foreign fq ids ('sys/…', 'b2/…') or already-prefixed
+    // locals (e.g. from an instance rig's linkBody()) — leave those alone.
+    const PB = (id) => (typeof id === 'string' && (id.includes('/') || id.startsWith(pref))) ? id : P(id);
     const owned = { bodies: new Set(), artis: new Set(), nodes: new Set() };
     const rec = { inst: null, handle: null, frameCb: null, owned };
 

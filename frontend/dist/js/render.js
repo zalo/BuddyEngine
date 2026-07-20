@@ -55,9 +55,9 @@ export class Renderer {
         // setViewportRect, and projectToScreen stays in full-desktop space.
         this.viewRect = { x: 0, y: 0, w: desk.screenW, h: desk.screenH };
 
-        // Debug collider visualization.
+        // Debug collider visualization (off by default; menu toggles it).
         this.debugGroup = new THREE.Group();
-        this.debugGroup.visible = true;
+        this.debugGroup.visible = false;
         this.scene.add(this.debugGroup);
         this.debugMeshes = new Map(); // collider key -> { group, box }
         this.debugTarget = null;

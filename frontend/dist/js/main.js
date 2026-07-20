@@ -155,12 +155,14 @@ async function boot() {
         logToBackend('panels init failed: ' + e.message);
     }
 
-    // Native overlay form-fit: the Windows build moves/resizes the
-    // borderless overlay window (SetWindowPos via the SetOverlayRect
-    // binding) to the buddies' bounding box — the DWM stops compositing a
-    // whole screen of empty transparency. Input is unaffected: the cursor
-    // stream is global, and colliders are in full-desktop coordinates.
-    if (bootstrap.overlay && window.go.main.App.SetOverlayRect) {
+    // Native overlay form-fit: currently DISABLED by default (fullscreen
+    // window) — moving the OS window and WebView2's presents can't be
+    // synchronized tightly enough from JS, and the mismatch reads as
+    // jerk/flash on every window move. The machinery stays for the iframe
+    // overlay (whose parent applies rects synchronously) and can be
+    // re-enabled here with ?formfit=1 for experiments.
+    const wantFormFit = new URLSearchParams(location.search).get('formfit') === '1';
+    if (wantFormFit && bootstrap.overlay && window.go.main.App.SetOverlayRect) {
         const dpr = window.devicePixelRatio || 1;
         const { startFormFit } = await import('./formfit.js');
         startFormFit({

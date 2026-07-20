@@ -1,17 +1,23 @@
-// Swordfighter — MimicKit RL humanoid as a Buddy API pack.
+// Swordfighter — MimicKit RL humanoid as a Buddy API pack, instanced.
 //
 // Everything character-specific lives here in the cell: ONNX runtime +
 // policies, MJCF parsing, observation building and behavior. The host only
-// sees an engine-agnostic rig (phys.articulation), retained-mode meshes,
-// and per-frame drive targets. Inference runs inside the frame callback so
-// actions computed from this frame's observations are applied before the
-// host's next physics step.
+// sees engine-agnostic rigs (phys.articulation), retained-mode meshes, and
+// per-frame drive targets.
+//
+// Instancing: ONE onnxruntime + ONE session pair serves every fighter.
+// A cell-level 30Hz control tick gathers observations from all instances,
+// stacks them into [N, obs] tensors and runs the policies BATCHED (probed
+// at boot; falls back to sequential through the same shared sessions if the
+// export has a fixed batch dim). Fighters prefer to fight each other: any
+// other sword-bearing rig (sibling instance or foreign cell) outranks the
+// cursor and lesser prey.
 
 export const meta = {
     name: 'Swordfighter',
     author: 'BuddyEngine',
-    version: '2',
-    description: 'MimicKit sword & shield humanoid: chases and strikes the mouse cursor, does idle skills when you leave it alone.',
+    version: '3',
+    description: 'MimicKit sword & shield humanoid. Duels other swordfighters on sight, otherwise chases and strikes the mouse cursor; does idle skills when left alone.',
 };
 
 const LLC_FILE = 'llc_sword_shield.onnx';
@@ -19,12 +25,12 @@ const HLC_FILE = 'hlc_strike.onnx';
 
 const buddy = await Buddy.ready();
 const mk = await buddy.assets.module('mimickit.js');
-const M = mk; // quat math lives alongside the parser
+const M = mk;
 
-buddy.log('swordfighter booting');
+buddy.log('swordfighter cell booting');
 
 // ---------------------------------------------------------------------------
-// ONNX runtime, in-cell (runtime files shared by the host via sys: assets)
+// ONNX runtime + shared sessions (one of each for ALL fighters)
 // ---------------------------------------------------------------------------
 await buddy.assets.script('sys:vendor/ort.wasm.min.js');
 const ortMjs = await buddy.assets.bytes('sys:vendor/ort-wasm-simd-threaded.mjs');
@@ -47,13 +53,30 @@ try {
 
 const data = mk.prepareHumanoidData(mk.extractOnnxMetadata(llcBuf));
 const LATENT_DIM = data.latent_dim || 64;
+const OBS_DIM = data.obs_dim;
 buddy.log('rig:', data.bodies.length, 'bodies,', data.dofInfo.length, 'dofs');
 
-// ---------------------------------------------------------------------------
-// Articulation + visuals through the Buddy API
-// ---------------------------------------------------------------------------
-const rig = buddy.phys.articulation('avatar', data, { x: -1.5 });
+// Can the exports take a batch dimension > 1? Probe once.
+let BATCH_OK = false;
+try {
+    const o2 = new ort.Tensor('float32', new Float32Array(2 * OBS_DIM), [2, OBS_DIM]);
+    const z2 = new ort.Tensor('float32', new Float32Array(2 * LATENT_DIM), [2, LATENT_DIM]);
+    const out = await llc.run({ obs: o2, latent: z2 });
+    BATCH_OK = out.action.dims[0] === 2;
+    if (BATCH_OK && hlc) {
+        const t2 = new ort.Tensor('float32', new Float32Array(2 * 15), [2, 15]);
+        const hout = await hlc.run({ obs: o2, task_obs: t2 });
+        BATCH_OK = hout.z.dims[0] === 2;
+    }
+} catch (e) {
+    BATCH_OK = false;
+}
+buddy.log('policy batching:', BATCH_OK ? 'dynamic (single run per tick)' : 'fixed (sequential, shared session)');
 
+// ---------------------------------------------------------------------------
+// Shared visual prototypes ('$'-ids): geometry + materials per rig link,
+// defined once; every instance's meshes reference them.
+// ---------------------------------------------------------------------------
 const BODY_COLORS = {
     pelvis: 0x5577aa, torso: 0x5577aa, head: 0xcc8866,
     right_upper_arm: 0x77aa55, right_lower_arm: 0x77aa55, right_hand: 0xcc8866,
@@ -72,46 +95,45 @@ function fromToPose(ft, alongY) {
     return { mid, len, quat: M.quatFromTwoVec(alongY, dir) };
 }
 
+const geomPlacements = []; // {body, geoId, matId, pos, quat} for instance meshes
 for (const body of data.bodies) {
-    const color = BODY_COLORS[body.name] || 0x888888;
     const matId = 'm_' + body.name;
-    buddy.gfx.material(matId, { type: 'standard', params: { color, roughness: 0.6, metalness: 0.2 } });
-    const groupId = 'g_' + body.name;
-    buddy.gfx.group(groupId).attach(rig.linkBody(body.name));
-
+    buddy.gfx.material(matId, {
+        type: 'standard',
+        params: { color: BODY_COLORS[body.name] || 0x888888, roughness: 0.6, metalness: 0.2 },
+    });
     body.geoms.forEach((g, gi) => {
         const geoId = `geo_${body.name}_${gi}`;
-        const nodeId = `n_${body.name}_${gi}`;
+        let placed = null;
         if (g.type === 'sphere') {
             buddy.gfx.geometry(geoId, { type: 'sphere', params: { r: g.radius } });
-            buddy.gfx.mesh(nodeId, { geo: geoId, mat: matId, parent: groupId, pos: g.pos });
+            placed = { pos: g.pos };
         } else if (g.type === 'capsule' && g.fromto) {
             const { mid, len, quat } = fromToPose(g.fromto, [0, 1, 0]);
             buddy.gfx.geometry(geoId, { type: 'capsule', params: { r: g.radius, l: len } });
-            buddy.gfx.mesh(nodeId, { geo: geoId, mat: matId, parent: groupId, pos: mid, quat });
+            placed = { pos: mid, quat };
         } else if (g.type === 'box') {
             const he = g.halfExtents;
             buddy.gfx.geometry(geoId, { type: 'box', params: { w: he[0]*2, h: he[1]*2, d: he[2]*2 } });
-            buddy.gfx.mesh(nodeId, { geo: geoId, mat: matId, parent: groupId, pos: g.pos });
+            placed = { pos: g.pos };
         } else if (g.type === 'cylinder') {
             if (g.fromto) {
                 const { mid, len, quat } = fromToPose(g.fromto, [0, 1, 0]);
                 buddy.gfx.geometry(geoId, { type: 'cylinder', params: { rt: g.radius, rb: g.radius, h: Math.max(len, 0.01) } });
-                buddy.gfx.mesh(nodeId, { geo: geoId, mat: matId, parent: groupId, pos: mid, quat });
+                placed = { pos: mid, quat };
             } else {
                 buddy.gfx.geometry(geoId, { type: 'cylinder', params: { rt: g.radius, rb: g.radius, h: (g.halfHeight || 0.015) * 2 } });
-                buddy.gfx.mesh(nodeId, { geo: geoId, mat: matId, parent: groupId, pos: g.pos || [0, 0, 0] });
+                placed = { pos: g.pos || [0, 0, 0] };
             }
         }
+        if (placed) geomPlacements.push({ body: body.name, gi, geoId, matId, ...placed });
     });
 }
 
 // ---------------------------------------------------------------------------
-// Observations (from the frame world view + articulation joint state)
+// Observation building (per fighter)
 // ---------------------------------------------------------------------------
-const rootBodyId = buddy.id + '/' + rig.linkBody(data.bodies[0].name);
 const keyIds = data.key_body_ids || [2, 5, 10, 13, 16, 6];
-const keyBodyIds = keyIds.map(i => buddy.id + '/' + rig.linkBody(data.bodies[i].name));
 
 function supportHeightAt(colliders, x, z) {
     let best = 0;
@@ -123,10 +145,10 @@ function supportHeightAt(colliders, x, z) {
     return best;
 }
 
-function buildObservation(world, supportZ) {
-    const obs = new Float32Array(data.obs_dim);
-    const js = world.arti.avatar;
-    const root = world.bodies.get(rootBodyId);
+function buildObservation(F, world, supportZ) {
+    const obs = new Float32Array(OBS_DIM);
+    const js = world.arti[F.artiLocal];
+    const root = world.bodies.get(F.rootBodyId);
     if (!js || !root) return null;
 
     const headingInv = M.calcHeadingQuatInv(root.quat);
@@ -157,7 +179,7 @@ function buildObservation(world, supportZ) {
 
     for (let i = 0; i < data.dofInfo.length; i++) obs[idx++] = js.dofVel[i];
 
-    for (const kid of keyBodyIds) {
+    for (const kid of F.keyBodyIds) {
         const b = world.bodies.get(kid);
         const rel = b
             ? [b.pos[0] - root.pos[0], b.pos[1] - root.pos[1], b.pos[2] - root.pos[2]]
@@ -170,56 +192,62 @@ function buildObservation(world, supportZ) {
 }
 
 // ---------------------------------------------------------------------------
-// Target selection: hunt the nearest foreign root object — the cursor's
-// physics proxy or any other buddy's root body (wisp ball, kirby, another
-// rig's pelvis). Hysteresis keeps it committed until something else is
-// meaningfully closer, then it switches victims.
+// Target selection. Priority: other swordfighters (sibling instances or any
+// foreign rig carrying a sword) — duels first — then the nearest of cursor
+// proxy / other buddies, with hysteresis against twitchy switching.
 // ---------------------------------------------------------------------------
-let targetId = 'sys/target';
-let nearestPreyDist = Infinity; // nearest non-cursor candidate (for idle gating)
-
-function pickTarget(world, root) {
-    const cands = [];
-    const cursorBody = world.bodies.get('sys/target');
-    if (cursorBody) cands.push(['sys/target', cursorBody]);
-    // First body per foreign owner = its root (rig roots precede their
-    // links in the snapshot; plain buddies lead with their main body).
-    const seen = new Set([buddy.id, 'sys']);
-    for (const [id, b] of world.bodies) {
-        const owner = id.split('/')[0];
-        if (seen.has(owner)) continue;
-        seen.add(owner);
-        cands.push([id, b]);
-    }
+function pickTarget(F, world, root) {
     const dist = (b) => Math.hypot(b.pos[0] - root.pos[0], b.pos[2] - root.pos[2]);
 
-    let bestId = 'sys/target', bestD = Infinity;
-    nearestPreyDist = Infinity;
-    for (const [id, b] of cands) {
+    // Rival fighters: any pelvis whose owner also owns a sword link, minus me.
+    let bestFighter = null, bestFighterD = Infinity;
+    for (const [id, b] of world.bodies) {
+        if (!id.endsWith('.pelvis') || id === F.rootBodyId) continue;
+        const rigPrefix = id.slice(0, -'.pelvis'.length);
+        if (!world.bodies.has(rigPrefix + '.sword')) continue;
         const d = dist(b);
-        if (d < bestD) { bestD = d; bestId = id; }
-        if (id !== 'sys/target' && d < nearestPreyDist) nearestPreyDist = d;
+        if (d < bestFighterD) { bestFighterD = d; bestFighter = id; }
     }
 
-    const cur = world.bodies.get(targetId);
-    if (!cur) { targetId = bestId; return; }
-    if (bestId !== targetId && bestD < dist(cur) * 0.75) {
-        targetId = bestId;
-        buddy.log('new target: ' + targetId);
+    let bestId = 'sys/target', bestD = Infinity;
+    F.nearestPreyDist = Infinity;
+    if (bestFighter) {
+        // A rival always outranks everything else.
+        bestId = bestFighter;
+        bestD = bestFighterD;
+        F.nearestPreyDist = bestFighterD;
+    } else {
+        const cursorBody = world.bodies.get('sys/target');
+        if (cursorBody) { bestId = 'sys/target'; bestD = dist(cursorBody); }
+        const seen = new Set(['sys']);
+        for (const [id, b] of world.bodies) {
+            if (id.startsWith(buddy.id + '/')) continue; // no bullying siblings' props
+            const owner = id.split('/')[0];
+            if (seen.has(owner)) continue;
+            seen.add(owner);
+            const d = dist(b);
+            if (d < F.nearestPreyDist) F.nearestPreyDist = d;
+            if (d < bestD) { bestD = d; bestId = id; }
+        }
+    }
+
+    const cur = world.bodies.get(F.targetId);
+    const curIsFighter = F.targetId.endsWith('.pelvis');
+    if (!cur || (bestFighter && !curIsFighter)) { F.targetId = bestId; return; }
+    if (bestId !== F.targetId && bestD < dist(cur) * 0.75) {
+        F.targetId = bestId;
     }
 }
 
-// ASE strike task obs (15) against the currently hunted body.
-function buildTaskObs(world, supportZ) {
+function buildTaskObs(F, world, supportZ) {
     const taskObs = new Float32Array(15);
-    const root = world.bodies.get(rootBodyId);
-    const tar = world.bodies.get(targetId) || world.bodies.get('sys/target');
+    const root = world.bodies.get(F.rootBodyId);
+    const tar = world.bodies.get(F.targetId) || world.bodies.get('sys/target');
     if (!root || !tar) return taskObs;
 
     const headingInv = M.calcHeadingQuatInv(root.quat);
     let idx = 0;
 
-    // Support-relative Z, clamped to the strike-reachable band from training.
     const relZ = Math.min(Math.max(tar.pos[2] - supportZ, 0.2), 2.2);
     const localTarPos = M.quatRotateVec(headingInv, [
         tar.pos[0] - root.pos[0],
@@ -241,11 +269,8 @@ function buildTaskObs(world, supportZ) {
 }
 
 // ---------------------------------------------------------------------------
-// Policies
+// Latents
 // ---------------------------------------------------------------------------
-let latent = sampleUnitLatent();
-let latentTarget = latent.slice();
-
 function sampleUnitLatent() {
     const v = new Float32Array(LATENT_DIM);
     let n = 0;
@@ -255,39 +280,22 @@ function sampleUnitLatent() {
     return v;
 }
 
-function slerpLatent() {
+function slerpLatent(F) {
     let n = 0;
-    for (let i = 0; i < latent.length; i++) {
-        latent[i] += 0.05 * (latentTarget[i] - latent[i]);
-        n += latent[i] * latent[i];
+    for (let i = 0; i < F.latent.length; i++) {
+        F.latent[i] += 0.05 * (F.latentTarget[i] - F.latent[i]);
+        n += F.latent[i] * F.latent[i];
     }
     n = Math.sqrt(n);
-    if (n > 1e-8) for (let i = 0; i < latent.length; i++) latent[i] /= n;
+    if (n > 1e-8) for (let i = 0; i < F.latent.length; i++) F.latent[i] /= n;
 }
 
-async function runStrike(obs, taskObs) {
-    const obsT = new ort.Tensor('float32', obs, [1, data.obs_dim]);
-    if (hlc) {
-        const taskT = new ort.Tensor('float32', taskObs, [1, 15]);
-        const z = (await hlc.run({ obs: obsT, task_obs: taskT })).z.data;
-        const zT = new ort.Tensor('float32', z, [1, LATENT_DIM]);
-        return (await llc.run({ obs: obsT, latent: zT })).action.data;
-    }
-    const zT = new ort.Tensor('float32', latent, [1, LATENT_DIM]);
-    return (await llc.run({ obs: obsT, latent: zT })).action.data;
-}
-
-async function runLatent(obs) {
-    const obsT = new ort.Tensor('float32', obs, [1, data.obs_dim]);
-    const zT = new ort.Tensor('float32', latent, [1, LATENT_DIM]);
-    return (await llc.run({ obs: obsT, latent: zT })).action.data;
-}
-
-function clampActions(action) {
+function clampActions(action, offset) {
     const lo = data.action_low, hi = data.action_high;
-    const out = new Array(action.length);
-    for (let i = 0; i < action.length; i++) {
-        let a = action[i];
+    const n = data.dofInfo.length;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+        let a = action[offset + i];
         if (lo && hi) a = Math.max(lo[i], Math.min(hi[i], a));
         out[i] = a;
     }
@@ -295,61 +303,160 @@ function clampActions(action) {
 }
 
 // ---------------------------------------------------------------------------
-// Behavior: strike at the mouse; idle skills when the cursor rests.
+// Instances
+// ---------------------------------------------------------------------------
+const fighters = new Map(); // iid -> F
+
+Buddy.instances((inst) => {
+    const sx = inst.spawn.x !== undefined ? inst.spawn.x : -1.5 - (inst.iid - 1) * 1.2;
+    const rig = inst.phys.articulation('avatar', data, { x: sx });
+
+    // Meshes reference the shared '$' prototypes; groups track the rig links.
+    for (const body of data.bodies) {
+        inst.gfx.group('g_' + body.name).attach(rig.linkBody(body.name));
+    }
+    for (const p of geomPlacements) {
+        inst.gfx.mesh(`n_${p.body}_${p.gi}`, {
+            geo: '$' + p.geoId, mat: '$' + p.matId,
+            parent: 'g_' + p.body, pos: p.pos, quat: p.quat,
+        });
+    }
+
+    const F = {
+        iid: inst.iid,
+        rig,
+        artiLocal: 'i' + inst.iid + '.avatar',
+        rootBodyId: inst.bodyId('avatar.' + data.bodies[0].name),
+        keyBodyIds: keyIds.map(i => inst.bodyId('avatar.' + data.bodies[i].name)),
+        targetId: 'sys/target',
+        nearestPreyDist: Infinity,
+        mode: 'strike',
+        latent: sampleUnitLatent(),
+        latentTarget: null,
+        lastIdleSkill: 0,
+    };
+    F.latentTarget = F.latent.slice();
+    fighters.set(inst.iid, F);
+    inst.log('fighter up at x=' + sx.toFixed(1));
+
+    return {
+        dispose() {
+            fighters.delete(inst.iid);
+        },
+    };
+});
+
+buddy.bus.on('sys.reset', () => {
+    for (const F of fighters.values()) {
+        F.latent = sampleUnitLatent();
+        F.latentTarget = F.latent.slice();
+    }
+    lastControl = 0;
+});
+
+// ---------------------------------------------------------------------------
+// Cell-level control tick: gather everyone, batch the policies.
 // ---------------------------------------------------------------------------
 const CONTROL_DT = 1 / 30;
 const IDLE_AFTER_S = 8;
 const IDLE_NEW_SKILL_S = 5;
 
-let mode = 'strike';
 let lastControl = 0;
 let lastCursor = { x: 0, y: 0 };
 let lastCursorMove = 0;
-let lastIdleSkill = 0;
 let busy = false;
-
-buddy.bus.on('sys.reset', () => {
-    latent = sampleUnitLatent();
-    latentTarget = latent.slice();
-    lastControl = 0;
-});
 
 buddy.onFrame(async (world) => {
     if (world.cursor.px !== lastCursor.x || world.cursor.py !== lastCursor.y) {
         lastCursor = { x: world.cursor.px, y: world.cursor.py };
         lastCursorMove = world.time;
     }
-
-    // Idle only when the cursor is resting AND no prey is worth chasing.
-    if (world.time - lastCursorMove > IDLE_AFTER_S && nearestPreyDist > 5) {
-        if (mode !== 'idle') { mode = 'idle'; latent = sampleUnitLatent(); latentTarget = latent.slice(); }
-        if (world.time - lastIdleSkill > IDLE_NEW_SKILL_S) {
-            latentTarget = sampleUnitLatent();
-            lastIdleSkill = world.time;
-        }
-    } else {
-        mode = 'strike';
-    }
-
-    if (busy || world.time - lastControl < CONTROL_DT) return;
+    if (busy || fighters.size === 0 || world.time - lastControl < CONTROL_DT) return;
     lastControl = world.time;
     busy = true;
     try {
-        const root = world.bodies.get(rootBodyId);
-        if (!root) return;
-        pickTarget(world, root);
-        const supportZ = supportHeightAt(world.colliders, root.pos[0], root.pos[2]);
-        const obs = buildObservation(world, supportZ);
-        if (!obs) return;
+        // Gather per-fighter observations.
+        const jobs = [];
+        for (const F of fighters.values()) {
+            const root = world.bodies.get(F.rootBodyId);
+            if (!root) continue;
+            pickTarget(F, world, root);
 
-        let action;
-        if (mode === 'strike') {
-            action = await runStrike(obs, buildTaskObs(world, supportZ));
-        } else {
-            slerpLatent();
-            action = await runLatent(obs);
+            // Idle only when the cursor rests AND nothing (rival included)
+            // is worth chasing.
+            if (world.time - lastCursorMove > IDLE_AFTER_S && F.nearestPreyDist > 5) {
+                if (F.mode !== 'idle') {
+                    F.mode = 'idle';
+                    F.latent = sampleUnitLatent();
+                    F.latentTarget = F.latent.slice();
+                }
+                if (world.time - F.lastIdleSkill > IDLE_NEW_SKILL_S) {
+                    F.latentTarget = sampleUnitLatent();
+                    F.lastIdleSkill = world.time;
+                }
+            } else {
+                F.mode = 'strike';
+            }
+
+            const supportZ = supportHeightAt(world.colliders, root.pos[0], root.pos[2]);
+            const obs = buildObservation(F, world, supportZ);
+            if (!obs) continue;
+            jobs.push({ F, obs, taskObs: F.mode === 'strike' ? buildTaskObs(F, world, supportZ) : null });
         }
-        if (action) rig.drive(clampActions(action));
+        if (!jobs.length) return;
+
+        if (BATCH_OK) {
+            // One stacked run for the whole roster: hlc over strikers to get
+            // their latents, then llc over everyone.
+            const N = jobs.length;
+            const latents = new Float32Array(N * LATENT_DIM);
+            const strikers = jobs.map((j, i) => j.taskObs ? i : -1).filter(i => i >= 0);
+            if (hlc && strikers.length) {
+                const sObs = new Float32Array(strikers.length * OBS_DIM);
+                const sTask = new Float32Array(strikers.length * 15);
+                strikers.forEach((ji, k) => {
+                    sObs.set(jobs[ji].obs, k * OBS_DIM);
+                    sTask.set(jobs[ji].taskObs, k * 15);
+                });
+                const z = (await hlc.run({
+                    obs: new ort.Tensor('float32', sObs, [strikers.length, OBS_DIM]),
+                    task_obs: new ort.Tensor('float32', sTask, [strikers.length, 15]),
+                })).z.data;
+                strikers.forEach((ji, k) => {
+                    latents.set(z.subarray(k * LATENT_DIM, (k + 1) * LATENT_DIM), ji * LATENT_DIM);
+                });
+            }
+            jobs.forEach((j, i) => {
+                if (!j.taskObs || !hlc) {
+                    slerpLatent(j.F);
+                    latents.set(j.F.latent, i * LATENT_DIM);
+                }
+            });
+            const allObs = new Float32Array(N * OBS_DIM);
+            jobs.forEach((j, i) => allObs.set(j.obs, i * OBS_DIM));
+            const action = (await llc.run({
+                obs: new ort.Tensor('float32', allObs, [N, OBS_DIM]),
+                latent: new ort.Tensor('float32', latents, [N, LATENT_DIM]),
+            })).action.data;
+            const stride = action.length / N;
+            jobs.forEach((j, i) => j.F.rig.drive(clampActions(action, i * stride)));
+        } else {
+            // Fixed-batch export: sequential, but still one shared session.
+            for (const j of jobs) {
+                const obsT = new ort.Tensor('float32', j.obs, [1, OBS_DIM]);
+                let zData;
+                if (j.taskObs && hlc) {
+                    const taskT = new ort.Tensor('float32', j.taskObs, [1, 15]);
+                    zData = (await hlc.run({ obs: obsT, task_obs: taskT })).z.data;
+                } else {
+                    slerpLatent(j.F);
+                    zData = j.F.latent;
+                }
+                const zT = new ort.Tensor('float32', zData, [1, LATENT_DIM]);
+                const action = (await llc.run({ obs: obsT, latent: zT })).action.data;
+                j.F.rig.drive(clampActions(action, 0));
+            }
+        }
     } catch (e) {
         buddy.log('control error: ' + (e.stack || e.message));
     } finally {
@@ -357,4 +464,4 @@ buddy.onFrame(async (world) => {
     }
 });
 
-buddy.log('swordfighter online');
+buddy.log('swordfighter cell online');

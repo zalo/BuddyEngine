@@ -93,6 +93,14 @@ export class Interact {
 
     // Called every frame before physics stepping.
     update() {
+        // Host-UI panels activate interactivity by global cursor position —
+        // DOM hover can't fire while the native overlay is click-through.
+        const ui = window.buddyUI;
+        if (ui && ui.hitTest) {
+            const dpr = window.devicePixelRatio || 1;
+            this.uiHover = ui.hitTest(this.cursor.x / dpr, this.cursor.y / dpr);
+        }
+
         const hit = this.hitTest();
         this.hovering = !!hit;
 

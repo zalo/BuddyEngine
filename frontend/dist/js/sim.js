@@ -396,8 +396,11 @@ export class SimWorld {
             for (const geom of body.geoms) {
                 const shape = this.createGeomShape(geom, shapeFlags);
                 if (shape) {
-                    // Articulations hit world(1) + buddy objects(4) + cursor(8).
-                    shape.setSimulationFilterData(new PhysX.PxFilterData(2, 13, 0, 0));
+                    // Articulations hit world(1) + other rigs(2) + buddy
+                    // objects(4) + cursor(8). Within ONE rig, link pairs are
+                    // filtered by eDISABLE_SELF_COLLISION above, so two
+                    // swordfighters clash while neither self-collides.
+                    shape.setSimulationFilterData(new PhysX.PxFilterData(2, 15, 0, 0));
                     link.attachShape(shape);
                 }
                 radius = Math.max(radius, geomBoundRadius(geom));
