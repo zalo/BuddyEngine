@@ -246,19 +246,22 @@ export class SimWorld {
         if (this.dynBodies.has(fqid)) this.removeBody(fqid);
 
         const s = desc.shape || { type: 'sphere', r: 0.1 };
-        let geom, radius;
+        let geom, radius, extX, extZ;
         if (s.type === 'box') {
             const hx = s.hx || 0.1, hy = s.hy || hx, hz = s.hz || hx;
             geom = new PhysX.PxBoxGeometry(hx, hy, hz);
             radius = Math.hypot(hx, hy, hz);
+            extX = hx; extZ = hz;
         } else if (s.type === 'capsule') {
             const r = s.r || 0.1, hh = s.hh || 0.1;
             geom = new PhysX.PxCapsuleGeometry(r, hh); // capsule axis = local X
             radius = r + hh;
+            extX = r + hh; extZ = r;
         } else {
             const r = s.r || 0.1;
             geom = new PhysX.PxSphereGeometry(r);
             radius = r;
+            extX = r; extZ = r;
         }
 
         const mat = this.physics.createMaterial(
@@ -305,7 +308,7 @@ export class SimWorld {
             if (lock.angZ) actor.setRigidDynamicLockFlag(L.eLOCK_ANGULAR_Z, true);
         }
         this.scene.addActor(actor);
-        this.dynBodies.set(fqid, { actor, radius, kinematic: !!desc.kinematic });
+        this.dynBodies.set(fqid, { actor, radius, extX, extZ, kinematic: !!desc.kinematic });
     }
 
     removeBody(fqid) {
@@ -728,6 +731,27 @@ export class SimWorld {
     }
 
     // -- world queries ---------------------------------------------------------
+
+    // Form-fit contributors: per-axis half-extents so the fit hugs tall or
+    // wide bodies instead of their (much larger) bounding spheres. Links use
+    // their bound radius — they're small and rotate in 3D.
+    fitTargets() {
+        const out = [];
+        for (const rec of this.articulations.values()) {
+            for (const l of rec.links) {
+                out.push({ id: rec.fq + '.' + l.name, actor: l.link, hx: l.radius, hz: l.radius, round: true });
+            }
+        }
+        for (const [fqid, b] of this.dynBodies) {
+            out.push({
+                id: fqid, actor: b.actor,
+                hx: b.extX !== undefined ? b.extX : b.radius,
+                hz: b.extZ !== undefined ? b.extZ : b.radius,
+                round: b.extX === undefined,
+            });
+        }
+        return out;
+    }
 
     // All grab/hover candidates: articulation links + buddy bodies.
     hoverTargets() {

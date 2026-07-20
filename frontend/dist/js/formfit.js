@@ -24,8 +24,7 @@ export function startFormFit({
     pageW, pageH,                 // full desktop/page size, CSS px
     requestRect,                  // (rectCss) => ask the host to move/resize the window
     onRect = () => {},            // notified after a rect is fully adopted
-    probePos = null,              // optional () => ({x, y}) CSS: where the host says the window IS
-    marginM = 0.45,               // meters beyond each body's bounding radius
+    marginM = 0.15,               // meters beyond each body's extents
     grid = 64,                    // quantize so resizes are rare
     minW = 160, minH = 100,       // content-scale floor; the menu gets its own boost
     intervalMs = 150,
@@ -44,41 +43,55 @@ export function startFormFit({
     function fitRect() {
         let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
         const boxes = [];
-        for (const t of sim.hoverTargets()) {
+        for (const t of sim.fitTargets()) {
             if (t.id.startsWith('sys/')) continue;
-            let px, pz;
+            let px, pz, hx = t.hx || 0.1, hz = t.hz || 0.1;
             try {
-                const p = t.actor.getGlobalPose().get_p();
+                const pose = t.actor.getGlobalPose();
+                const p = pose.get_p();
                 px = p.get_x(); pz = p.get_z();
+                if (!t.round && hx !== hz) {
+                    // Rotation-aware AABB of the shape's footprint (buddy
+                    // bodies spin around the depth axis; exact for that,
+                    // conservative enough for anything else).
+                    const q = pose.get_q();
+                    const th = 2 * Math.atan2(q.get_y(), q.get_w());
+                    const c = Math.abs(Math.cos(th)), s = Math.abs(Math.sin(th));
+                    const ax = hx * c + hz * s, az = hx * s + hz * c;
+                    hx = ax; hz = az;
+                }
             } catch (e) { continue; }
-            const r = (t.radius || 0.1) + marginM;
+            hx += marginM; hz += marginM;
             // Clamp each box at the ground: padding below a standing buddy's
             // feet would only drag the window down over the taskbar.
-            const bz0 = Math.max(pz - r, zFloor);
-            boxes.push({ x0: px - r, z0: bz0, x1: px + r, z1: pz + r });
-            x0 = Math.min(x0, px - r); x1 = Math.max(x1, px + r);
-            z0 = Math.min(z0, bz0); z1 = Math.max(z1, pz + r);
+            const bz0 = Math.max(pz - hz, zFloor);
+            boxes.push({ x0: px - hx, z0: bz0, x1: px + hx, z1: pz + hz });
+            x0 = Math.min(x0, px - hx); x1 = Math.max(x1, px + hx);
+            z0 = Math.min(z0, bz0); z1 = Math.max(z1, pz + hz);
         }
         renderer.setDebugFitBoxes(renderer.debugGroup.visible ? boxes : []);
         if (!boxes.length) return { x: 0, y: 0, w: pageW, h: maxY };
         // world -> CSS px (y flips: high z = small y)
         const tl = desk.toScreen(x0, z1), br = desk.toScreen(x1, z0);
-        // Horizontal: quantize both edges outward.
+        // Horizontal: each EDGE anchors to the absolute grid, so a drifting
+        // bounding box changes one edge at a time — every window change is
+        // then a resize, which hosts apply observably (resize event); pure
+        // translations, whose apply-time we can't observe, stop happening.
         let rx = Math.floor(tl.x / DPR / grid) * grid;
-        let rw = Math.ceil((br.x / DPR - tl.x / DPR + grid) / grid) * grid;
-        rw = Math.max(rw, minW);
-        rx = Math.max(0, Math.min(rx, pageW - rw));
-        rw = Math.min(rw, pageW - rx);
-        // Vertical: the bottom hugs the content exactly (usually the ground
-        // line); only the top edge is quantized, so grid slack becomes jump
-        // headroom instead of dead space below the buddies' feet.
-        // Fine-quantized so idle bobbing doesn't churn resizes; standing on
-        // the ground it clamps to the taskbar line exactly.
+        let rRight = Math.ceil(br.x / DPR / grid) * grid;
+        rx = Math.max(0, rx);
+        rRight = Math.min(pageW, Math.max(rRight, rx + minW));
+        rx = Math.min(rx, rRight - minW);
+        rx = Math.max(0, rx);
+        // Vertical: the bottom hugs the content (fine-quantized so idle
+        // bobbing doesn't churn; on the ground it clamps to the taskbar
+        // line exactly); only the top edge uses the coarse grid, so slack
+        // becomes jump headroom instead of dead space below the feet.
         const yBottom = Math.min(Math.ceil(br.y / DPR / 16) * 16, maxY);
         let ry = Math.floor(tl.y / DPR / grid) * grid;
         if (yBottom - ry < minH) ry = yBottom - minH;
         ry = Math.max(0, ry);
-        return { x: rx, y: ry, w: rw, h: Math.max(1, Math.round(yBottom - ry)) };
+        return { x: rx, y: ry, w: rRight - rx, h: Math.max(1, Math.round(yBottom - ry)) };
     }
 
     // DOM-view cells position content in desktop/page coords; counter-shift
@@ -145,31 +158,16 @@ export function startFormFit({
         };
     }
 
-    // Issue a rect through the two-phase transition.
+    // Issue a rect through the two-phase transition. Callers guarantee the
+    // size differs from cur (see the union-split in the tick), so adoption
+    // always has an observable resize event to key on.
     function requestTransition(r) {
-        const sameSize = r.w === cur.w && r.h === cur.h;
         pending = r;
         pendingAt = performance.now();
         beginTransition(r);
         requestAnimationFrame(() => {
             if (pending !== r) return;
-            try { requestRect(r); } catch (e) { rollback(); return; }
-            if (sameSize) {
-                if (probePos) {
-                    const t0 = performance.now();
-                    const poll = () => {
-                        if (pending !== r) return;
-                        let p = null;
-                        try { p = probePos(); } catch (e) {}
-                        if (p && Math.abs(p.x - r.x) <= 3 && Math.abs(p.y - r.y) <= 3) return finalize(r);
-                        if (performance.now() - t0 > 500) return finalize(r);
-                        requestAnimationFrame(poll);
-                    };
-                    requestAnimationFrame(poll);
-                } else {
-                    requestAnimationFrame(() => { if (pending === r) finalize(r); });
-                }
-            }
+            try { requestRect(r); } catch (e) { rollback(); }
         });
     }
 
@@ -209,10 +207,21 @@ export function startFormFit({
         }
         menuBoosted = false;
 
-        const r = fitRect();
+        let r = fitRect();
         if (r.x === cur.x && r.y === cur.y && r.w === cur.w && r.h === cur.h) {
             offsetCellIframes(); // a late view.show may have reset styles
             return;
+        }
+        if (r.w === cur.w && r.h === cur.h) {
+            // Same size, new origin (fast drift crossed grid lines on both
+            // edges at once): split into a grow now — a resize, observable —
+            // and let the next tick shrink to the tight rect.
+            const x0 = Math.min(cur.x, r.x), y0 = Math.min(cur.y, r.y);
+            r = {
+                x: x0, y: y0,
+                w: Math.max(cur.x + cur.w, r.x + r.w) - x0,
+                h: Math.max(cur.y + cur.h, r.y + r.h) - y0,
+            };
         }
         requestTransition(r);
     }, intervalMs);

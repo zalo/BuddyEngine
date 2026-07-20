@@ -163,9 +163,6 @@ async function boot() {
             requestRect: (r) => window.go.main.App.SetOverlayRect(
                 Math.round(r.x * dpr), Math.round(r.y * dpr),
                 Math.round(r.w * dpr), Math.round(r.h * dpr)),
-            // The webview knows where its window really is — lets the module
-            // confirm translation-only moves instead of guessing frames.
-            probePos: () => ({ x: window.screenX, y: window.screenY }),
         });
     }
 
