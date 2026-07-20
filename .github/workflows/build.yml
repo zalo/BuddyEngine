@@ -25,10 +25,16 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
       - name: Build (windows/amd64)
         run: wails build -platform windows/amd64 -s -skipbindings
+      - name: Package with workshop packs
+        run: |
+          mkdir -p _dist
+          cp build/bin/BuddyEngine.exe _dist/
+          rsync -a --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
+            --exclude='native/' workshop _dist/
       - uses: actions/upload-artifact@v4
         with:
           name: BuddyEngine-windows
-          path: build/bin/BuddyEngine.exe
+          path: _dist
 
   linux:
     runs-on: ubuntu-latest
@@ -45,10 +51,17 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
       - name: Build (linux/amd64, webkit 4.1)
         run: wails build -platform linux/amd64 -s -skipbindings -tags webkit2_41
+      - name: Package with workshop packs (tar preserves the exec bit)
+        run: |
+          mkdir -p _dist
+          cp build/bin/BuddyEngine _dist/
+          rsync -a --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
+            --exclude='native/' workshop _dist/
+          tar -czf BuddyEngine-linux.tar.gz -C _dist .
       - uses: actions/upload-artifact@v4
         with:
           name: BuddyEngine-linux
-          path: build/bin/BuddyEngine
+          path: BuddyEngine-linux.tar.gz
 
   macos:
     runs-on: macos-latest
@@ -61,6 +74,11 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
       - name: Build (darwin/universal)
         run: wails build -platform darwin/universal -s -skipbindings
+      - name: Bundle workshop packs into the .app
+        run: |
+          rsync -a --exclude='*.z64' --exclude='*.n64' --exclude='*.v64' \
+            --exclude='native/' workshop \
+            build/bin/BuddyEngine.app/Contents/Resources/
       - name: Zip .app bundle
         run: ditto -c -k --keepParent build/bin/BuddyEngine.app build/bin/BuddyEngine.app.zip
       - uses: actions/upload-artifact@v4

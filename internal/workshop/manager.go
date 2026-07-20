@@ -58,8 +58,21 @@ func (m *Manager) Rescan() {
 	defer m.mu.Unlock()
 	m.packs = map[string]*PackInfo{}
 
+	// Be generous about where the workshop folder may sit relative to the
+	// executable: next to it, next to its containing folder (bin/ + workshop/
+	// sibling layouts), and for macOS .app bundles both inside
+	// Contents/Resources and next to the bundle itself — so an unpacked
+	// artifact works out of the box wherever the user drops it.
 	if exe, err := os.Executable(); err == nil {
-		m.scanDir(filepath.Join(filepath.Dir(exe), "workshop"), "local")
+		dir := filepath.Dir(exe)
+		m.scanDir(filepath.Join(dir, "workshop"), "local")
+		m.scanDir(filepath.Join(filepath.Dir(dir), "workshop"), "local")
+		if strings.HasSuffix(dir, filepath.Join(".app", "Contents", "MacOS")) ||
+			strings.HasSuffix(dir, "/Contents/MacOS") {
+			bundle := filepath.Dir(filepath.Dir(dir)) // the .app root
+			m.scanDir(filepath.Join(bundle, "Contents", "Resources", "workshop"), "local")
+			m.scanDir(filepath.Join(filepath.Dir(bundle), "workshop"), "local")
+		}
 	}
 	// Also support a workshop folder in the working directory (wails dev).
 	if wd, err := os.Getwd(); err == nil {
