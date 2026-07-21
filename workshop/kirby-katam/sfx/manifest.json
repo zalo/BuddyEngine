@@ -1,0 +1,1907 @@
+{
+ "100": {
+  "file": "se_100.wav",
+  "name": "SE_KIRBY_JUMP",
+  "ms": 318
+ },
+ "101": {
+  "file": "se_101.wav",
+  "name": "SE_KIRBY_INHALE",
+  "ms": 6446,
+  "loop": true
+ },
+ "102": {
+  "file": "se_102.wav",
+  "name": "SE_KIRBY_STUFFED_CHEEKS_UNUSED",
+  "ms": 117
+ },
+ "103": {
+  "file": "se_103.wav",
+  "name": "SE_KIRBY_STARSHOT_1",
+  "ms": 569
+ },
+ "104": {
+  "file": "se_104.wav",
+  "name": "SE_KIRBY_STARSHOT_2",
+  "ms": 569
+ },
+ "105": {
+  "file": "se_105.wav",
+  "name": "SE_KIRBY_LANDING",
+  "ms": 67
+ },
+ "106": {
+  "file": "se_106.wav",
+  "name": "SE_KIRBY_ABILITY",
+  "ms": 1005
+ },
+ "107": {
+  "file": "se_107.wav",
+  "name": "SE_KIRBY_DMG_1",
+  "ms": 703
+ },
+ "108": {
+  "file": "se_108.wav",
+  "name": "SE_KIRBY_DMG_2",
+  "ms": 703
+ },
+ "109": {
+  "file": "se_109.wav",
+  "name": "SE_KIRBY_DMG_3",
+  "ms": 335
+ },
+ "110": {
+  "file": "se_110.wav",
+  "name": "SE_KIRBY_SWALLOW",
+  "ms": 335
+ },
+ "111": {
+  "file": "se_111.wav",
+  "name": "SE_KIRBY_AIRSHOT",
+  "ms": 218
+ },
+ "112": {
+  "file": "se_112.wav",
+  "name": "SE_KIRBY_FLOAT",
+  "ms": 452
+ },
+ "113": {
+  "file": "se_113.wav",
+  "name": "SE_KIRBY_BOUNCE",
+  "ms": 117
+ },
+ "114": {
+  "file": "se_114.wav",
+  "name": "SE_KIRBY_DASH",
+  "ms": 234
+ },
+ "115": {
+  "file": "se_115.wav",
+  "name": "SE_KIRBY_SLIDING",
+  "ms": 938
+ },
+ "116": {
+  "file": "se_116.wav",
+  "name": "SE_KIRBY_BRAKE",
+  "ms": 151
+ },
+ "117": {
+  "file": "se_117.wav",
+  "name": "SE_KIRBY_SWIM_1",
+  "ms": 335
+ },
+ "118": {
+  "file": "se_118.wav",
+  "name": "SE_KIRBY_SWIM_2",
+  "ms": 335
+ },
+ "119": {
+  "file": "se_119.wav",
+  "name": "SE_KIRBY_ICE_DMG",
+  "ms": 603
+ },
+ "120": {
+  "file": "se_120.wav",
+  "name": "SE_ABILITY_HAMMER_CHARGE_ATTACK",
+  "ms": 720
+ },
+ "121": {
+  "file": "se_121.wav",
+  "name": "SE_KIRBY_FIRE_DMG",
+  "ms": 720
+ },
+ "122": {
+  "file": "se_122.wav",
+  "name": "SE_KIRBY_FIRE_DMG_STUFFED_CHEEKS",
+  "ms": 720
+ },
+ "123": {
+  "file": "se_123.wav",
+  "name": "SE_KIRBY_ICE_DMG_STUFFED_CHEEKS",
+  "ms": 569
+ },
+ "124": {
+  "file": "se_124.wav",
+  "name": "SE_KIRBY_CLIMB_UP",
+  "ms": 134
+ },
+ "125": {
+  "file": "se_125.wav",
+  "name": "SE_KIRBY_CLIMB_DOWN",
+  "ms": 117
+ },
+ "126": {
+  "file": "se_126.wav",
+  "name": "SE_KIRBY_STAR_DESTROY",
+  "ms": 402
+ },
+ "127": {
+  "file": "se_127.wav",
+  "name": "SE_KIRBY_WATER_ATTACK",
+  "ms": 167
+ },
+ "128": {
+  "file": "se_128.wav",
+  "name": "SE_WATER_SPLASH",
+  "ms": 402
+ },
+ "129": {
+  "file": "se_129.wav",
+  "name": "SE_KIRBY_STAR_RELEASE",
+  "ms": 201
+ },
+ "130": {
+  "file": "se_130.wav",
+  "name": "SE_KIRBY_STAR_BOUNCE",
+  "ms": 67
+ },
+ "131": {
+  "file": "se_131.wav",
+  "name": "SE_KIRBY_HUG",
+  "ms": 318
+ },
+ "132": {
+  "file": "se_132.wav",
+  "name": "SE_KIRBY_LOW_HEALTH",
+  "ms": 887
+ },
+ "133": {
+  "file": "se_133.wav",
+  "name": "SE_KIRBY_FLOAT_START",
+  "ms": 452
+ },
+ "134": {
+  "file": "se_134.wav",
+  "name": "SE_08D558B8",
+  "ms": 552,
+  "loop": true
+ },
+ "135": {
+  "file": "se_135.wav",
+  "name": "SE_KIRBY_STACK_JUMP",
+  "ms": 536
+ },
+ "136": {
+  "file": "se_136.wav",
+  "name": "SE_08D55A98",
+  "ms": 6446,
+  "loop": true
+ },
+ "137": {
+  "file": "se_137.wav",
+  "name": "SE_KIRBY_CALL",
+  "ms": 837
+ },
+ "139": {
+  "file": "se_139.wav",
+  "name": "SE_COOKED_KIRBY",
+  "ms": 720
+ },
+ "140": {
+  "file": "se_140.wav",
+  "name": "SE_KIRBY_SLIP_BANANA",
+  "ms": 218
+ },
+ "141": {
+  "file": "se_141.wav",
+  "name": "SE_KIRBY_WIPE_FACE",
+  "ms": 318
+ },
+ "142": {
+  "file": "se_142.wav",
+  "name": "SE_ABILITY_FIRE_ATTACK",
+  "ms": 3700,
+  "loop": true
+ },
+ "143": {
+  "file": "se_143.wav",
+  "name": "SE_ABILITY_ICE_ATTACK",
+  "ms": 5240,
+  "loop": true
+ },
+ "144": {
+  "file": "se_144.wav",
+  "name": "SE_ABILITY_ICE_BLOCK_PUSH",
+  "ms": 268
+ },
+ "145": {
+  "file": "se_145.wav",
+  "name": "SE_ABILITY_BURNING_ATTACK",
+  "ms": 2829,
+  "loop": true
+ },
+ "146": {
+  "file": "se_146.wav",
+  "name": "SE_ABILITY_COLLISION",
+  "ms": 502
+ },
+ "147": {
+  "file": "se_147.wav",
+  "name": "SE_ABILITY_WHEEL_TRANSFORM",
+  "ms": 3432,
+  "loop": true
+ },
+ "148": {
+  "file": "se_148.wav",
+  "name": "SE_ABILITY_WHEEL_TURN",
+  "ms": 218
+ },
+ "149": {
+  "file": "se_149.wav",
+  "name": "SE_ABILITY_PARASOL_ATTACK",
+  "ms": 167
+ },
+ "150": {
+  "file": "se_150.wav",
+  "name": "SE_ABILITY_CUTTER_ATTACK",
+  "ms": 201
+ },
+ "151": {
+  "file": "se_151.wav",
+  "name": "SE_ABILITY_BEAM_ATTACK",
+  "ms": 703
+ },
+ "152": {
+  "file": "se_152.wav",
+  "name": "SE_ABILITY_STONE_SLAM",
+  "ms": 218
+ },
+ "153": {
+  "file": "se_153.wav",
+  "name": "SE_ABILITY_STONE_TRANSFORM",
+  "ms": 117
+ },
+ "154": {
+  "file": "se_154.wav",
+  "name": "SE_08D56118",
+  "ms": 619,
+  "loop": true
+ },
+ "155": {
+  "file": "se_155.wav",
+  "name": "SE_ABILITY_BOMB_SPAWN",
+  "ms": 419
+ },
+ "156": {
+  "file": "se_156.wav",
+  "name": "SE_ABILITY_BOMB_THROW",
+  "ms": 419
+ },
+ "157": {
+  "file": "se_157.wav",
+  "name": "SE_ABILITY_BOMB_EXPLODE",
+  "ms": 720
+ },
+ "158": {
+  "file": "se_158.wav",
+  "name": "SE_ABILITY_THROW_GRAB",
+  "ms": 184
+ },
+ "159": {
+  "file": "se_159.wav",
+  "name": "SE_ABILITY_THROW_ATTACK",
+  "ms": 385
+ },
+ "160": {
+  "file": "se_160.wav",
+  "name": "SE_ABILITY_THROW_COLLISION",
+  "ms": 134
+ },
+ "161": {
+  "file": "se_161.wav",
+  "name": "SE_ABILITY_SLEEP_SNORE",
+  "ms": 519
+ },
+ "162": {
+  "file": "se_162.wav",
+  "name": "SE_ABILITY_SLEEP_WAKE",
+  "ms": 218
+ },
+ "163": {
+  "file": "se_163.wav",
+  "name": "SE_ABILITY_COOK_START",
+  "ms": 218
+ },
+ "164": {
+  "file": "se_164.wav",
+  "name": "SE_ABILITY_COOK_POTS",
+  "ms": 318
+ },
+ "165": {
+  "file": "se_165.wav",
+  "name": "SE_ABILITY_COOK_STIR",
+  "ms": 1624
+ },
+ "166": {
+  "file": "se_166.wav",
+  "name": "SE_FOOD_SPAWN",
+  "ms": 117
+ },
+ "167": {
+  "file": "se_167.wav",
+  "name": "SE_LASER_ATTACK",
+  "ms": 419
+ },
+ "168": {
+  "file": "se_168.wav",
+  "name": "SE_LASER_REDIRECT",
+  "ms": 519
+ },
+ "169": {
+  "file": "se_169.wav",
+  "name": "SE_08D56520",
+  "ms": 502
+ },
+ "170": {
+  "file": "se_170.wav",
+  "name": "SE_08D56564",
+  "ms": 151
+ },
+ "171": {
+  "file": "se_171.wav",
+  "name": "SE_08D565A8",
+  "ms": 151
+ },
+ "172": {
+  "file": "se_172.wav",
+  "name": "SE_08D565EC",
+  "ms": 151
+ },
+ "173": {
+  "file": "se_173.wav",
+  "name": "SE_ABILITY_COOK_SALT",
+  "ms": 151
+ },
+ "174": {
+  "file": "se_174.wav",
+  "name": "SE_ABILITY_UFO_BEAM_ATTACK",
+  "ms": 703
+ },
+ "175": {
+  "file": "se_175.wav",
+  "name": "SE_ABILITY_UFO_SMALL_LASER_ATTACK",
+  "ms": 318
+ },
+ "176": {
+  "file": "se_176.wav",
+  "name": "SE_ABILITY_UFO_MEDIUM_LASER_ATTACK",
+  "ms": 720
+ },
+ "177": {
+  "file": "se_177.wav",
+  "name": "SE_ABILITY_UFO_LARGE_LASER_ATTACK",
+  "ms": 1005
+ },
+ "178": {
+  "file": "se_178.wav",
+  "name": "SE_ABILITY_UFO_LASER_REDIRECT",
+  "ms": 167
+ },
+ "179": {
+  "file": "se_179.wav",
+  "name": "SE_ABILITY_UFO_FLOATING",
+  "ms": 151
+ },
+ "180": {
+  "file": "se_180.wav",
+  "name": "SE_ABILITY_MASTER_WAVE_CHARGED",
+  "ms": 419
+ },
+ "181": {
+  "file": "se_181.wav",
+  "name": "SE_ABILITY_SPARK_ATTACK",
+  "ms": 4437,
+  "loop": true
+ },
+ "182": {
+  "file": "se_182.wav",
+  "name": "SE_ABILITY_TORNADO_ATTACK",
+  "ms": 603
+ },
+ "183": {
+  "file": "se_183.wav",
+  "name": "SE_ABILITY_TORNADO_TRANSFORM",
+  "ms": 603
+ },
+ "184": {
+  "file": "se_184.wav",
+  "name": "SE_ABILITY_HAMMER_ATTACK",
+  "ms": 318
+ },
+ "185": {
+  "file": "se_185.wav",
+  "name": "SE_ABILITY_HAMMER_MIDAIR",
+  "ms": 301
+ },
+ "186": {
+  "file": "se_186.wav",
+  "name": "SE_08D56B58",
+  "ms": 234
+ },
+ "187": {
+  "file": "se_187.wav",
+  "name": "SE_ABILITY_HAMMER_GROUND",
+  "ms": 234
+ },
+ "188": {
+  "file": "se_188.wav",
+  "name": "SE_08D56C08",
+  "ms": 2277
+ },
+ "189": {
+  "file": "se_189.wav",
+  "name": "SE_ABILITY_HAMMER_CHARGE",
+  "ms": 301
+ },
+ "190": {
+  "file": "se_190.wav",
+  "name": "SE_08D56C50",
+  "ms": 234
+ },
+ "191": {
+  "file": "se_191.wav",
+  "name": "SE_ABILITY_HAMMER_RUN_ATTACK",
+  "ms": 603
+ },
+ "192": {
+  "file": "se_192.wav",
+  "name": "SE_08D56D14",
+  "ms": 234
+ },
+ "193": {
+  "file": "se_193.wav",
+  "name": "SE_ABILITY_SWORD_ATTACK",
+  "ms": 318
+ },
+ "194": {
+  "file": "se_194.wav",
+  "name": "SE_ABILITY_SWORD_MIDAIR",
+  "ms": 419
+ },
+ "195": {
+  "file": "se_195.wav",
+  "name": "SE_ABILITY_SWORD_COMBO_1",
+  "ms": 318
+ },
+ "196": {
+  "file": "se_196.wav",
+  "name": "SE_ABILITY_SWORD_COMBO_2",
+  "ms": 218
+ },
+ "197": {
+  "file": "se_197.wav",
+  "name": "SE_ABILITY_SWORD_UPSLASH",
+  "ms": 502
+ },
+ "198": {
+  "file": "se_198.wav",
+  "name": "SE_ABILITY_MISSILE_TRANSFORM",
+  "ms": 820
+ },
+ "199": {
+  "file": "se_199.wav",
+  "name": "SE_ABILITY_MISSILE_MOVEMENT",
+  "ms": 4186,
+  "loop": true
+ },
+ "200": {
+  "file": "se_200.wav",
+  "name": "SE_ABILITY_MISSILE_EXPLOSION",
+  "ms": 720
+ },
+ "201": {
+  "file": "se_201.wav",
+  "name": "SE_ABILITY_FIGHTER_COMBO_1",
+  "ms": 218
+ },
+ "202": {
+  "file": "se_202.wav",
+  "name": "SE_ABILITY_FIGHTER_COMBO_2",
+  "ms": 201
+ },
+ "203": {
+  "file": "se_203.wav",
+  "name": "SE_ABILITY_FIGHTER_COMBO_3",
+  "ms": 619
+ },
+ "204": {
+  "file": "se_204.wav",
+  "name": "SE_ABILITY_FIGHTER_DOWN_DASH",
+  "ms": 502
+ },
+ "205": {
+  "file": "se_205.wav",
+  "name": "SE_ABILITY_FIGHTER_CHARGE_1",
+  "ms": 151
+ },
+ "206": {
+  "file": "se_206.wav",
+  "name": "SE_ABILITY_FIGHTER_CHARGE_2",
+  "ms": 151
+ },
+ "207": {
+  "file": "se_207.wav",
+  "name": "SE_ABILITY_FIGHTER_CHARGE_3",
+  "ms": 151
+ },
+ "208": {
+  "file": "se_208.wav",
+  "name": "SE_ABILITY_FIGHTER_SMALL_WAVE",
+  "ms": 352
+ },
+ "209": {
+  "file": "se_209.wav",
+  "name": "SE_ABILITY_FIGHTER_LARGE_WAVE",
+  "ms": 686
+ },
+ "210": {
+  "file": "se_210.wav",
+  "name": "SE_ABILITY_FIGHTER_1_HP_ATTACK",
+  "ms": 1005
+ },
+ "211": {
+  "file": "se_211.wav",
+  "name": "SE_ABILITY_FIGHTER_UPPERCUT",
+  "ms": 820
+ },
+ "212": {
+  "file": "se_212.wav",
+  "name": "SE_ABILITY_FIGHTER_WALK_ATTACK",
+  "ms": 603
+ },
+ "213": {
+  "file": "se_213.wav",
+  "name": "SE_ABILITY_FIGHTER_RUN_ATTACK",
+  "ms": 820
+ },
+ "214": {
+  "file": "se_214.wav",
+  "name": "SE_ABILITY_MAGIC_CAST",
+  "ms": 1122
+ },
+ "215": {
+  "file": "se_215.wav",
+  "name": "SE_ABILITY_MAGIC_ITEM",
+  "ms": 117
+ },
+ "216": {
+  "file": "se_216.wav",
+  "name": "SE_ABILITY_MAGIC_META_KNIGHT",
+  "ms": 619
+ },
+ "217": {
+  "file": "se_217.wav",
+  "name": "SE_ABILITY_SMASH_AIR_SPIN",
+  "ms": 619
+ },
+ "218": {
+  "file": "se_218.wav",
+  "name": "SE_08D57760",
+  "ms": 502
+ },
+ "219": {
+  "file": "se_219.wav",
+  "name": "SE_08D57780",
+  "ms": 419
+ },
+ "220": {
+  "file": "se_220.wav",
+  "name": "SE_08D577A4",
+  "ms": 218
+ },
+ "221": {
+  "file": "se_221.wav",
+  "name": "SE_ABILITY_CUPID_CHARGE_1",
+  "ms": 385,
+  "loop": true
+ },
+ "222": {
+  "file": "se_222.wav",
+  "name": "SE_ABILITY_CUPID_CHARGE_2",
+  "ms": 352,
+  "loop": true
+ },
+ "223": {
+  "file": "se_223.wav",
+  "name": "SE_ABILITY_CUPID_SHOOT",
+  "ms": 318
+ },
+ "224": {
+  "file": "se_224.wav",
+  "name": "SE_ABILITY_CUPID_FLOAT",
+  "ms": 519
+ },
+ "225": {
+  "file": "se_225.wav",
+  "name": "SE_ABILITY_MASTER_WAVE_ATTACK",
+  "ms": 820
+ },
+ "226": {
+  "file": "se_226.wav",
+  "name": "SE_ABILITY_CRASH_ATTACK",
+  "ms": 3047
+ },
+ "227": {
+  "file": "se_227.wav",
+  "name": "SE_08D58014",
+  "ms": 1858
+ },
+ "228": {
+  "file": "se_228.wav",
+  "name": "SE_08D58038",
+  "ms": 234
+ },
+ "229": {
+  "file": "se_229.wav",
+  "name": "SE_ABILITY_MASTER_RUN_ATTACK",
+  "ms": 586,
+  "loop": true
+ },
+ "300": {
+  "file": "se_300.wav",
+  "name": "SE_OBJECT_ENEMY_DESPAWN_1",
+  "ms": 318
+ },
+ "301": {
+  "file": "se_301.wav",
+  "name": "SE_OBJECT_ENEMY_DESPAWN_2",
+  "ms": 318
+ },
+ "302": {
+  "file": "se_302.wav",
+  "name": "SE_OBJECT_ENEMY_DESPAWN_3",
+  "ms": 318
+ },
+ "303": {
+  "file": "se_303.wav",
+  "name": "SE_OBJECT_BULLET_DESPAWN",
+  "ms": 218
+ },
+ "304": {
+  "file": "se_304.wav",
+  "name": "SE_KIRBY_ENEMY_COLLISION",
+  "ms": 218
+ },
+ "305": {
+  "file": "se_305.wav",
+  "name": "SE_08D58198",
+  "ms": 218
+ },
+ "306": {
+  "file": "se_306.wav",
+  "name": "SE_08D581BC",
+  "ms": 318
+ },
+ "307": {
+  "file": "se_307.wav",
+  "name": "SE_08D581E0",
+  "ms": 318
+ },
+ "308": {
+  "file": "se_308.wav",
+  "name": "SE_08D5820C",
+  "ms": 318
+ },
+ "309": {
+  "file": "se_309.wav",
+  "name": "SE_08D58274",
+  "ms": 419
+ },
+ "310": {
+  "file": "se_310.wav",
+  "name": "SE_OBJECT_BOMB_EXPLODE",
+  "ms": 619
+ },
+ "311": {
+  "file": "se_311.wav",
+  "name": "SE_OBJECT_ICE_EXPLODE",
+  "ms": 218
+ },
+ "312": {
+  "file": "se_312.wav",
+  "name": "SE_BRONTO_BURT_FLY",
+  "ms": 318
+ },
+ "313": {
+  "file": "se_313.wav",
+  "name": "SE_METAL_GUARDIAN_BIG_LASER",
+  "ms": 218
+ },
+ "314": {
+  "file": "se_314.wav",
+  "name": "SE_WADDLE_DOO_BEAM_ATTACK",
+  "ms": 619
+ },
+ "315": {
+  "file": "se_315.wav",
+  "name": "SE_BASIC_ENEMY_FIRE_ATTACK",
+  "ms": 318
+ },
+ "316": {
+  "file": "se_316.wav",
+  "name": "SE_LASER_BALL_LASER_ATTACK",
+  "ms": 318
+ },
+ "317": {
+  "file": "se_317.wav",
+  "name": "SE_PENGY_ICE_ATTACK",
+  "ms": 419
+ },
+ "318": {
+  "file": "se_318.wav",
+  "name": "SE_ROCKY_SLAM",
+  "ms": 218
+ },
+ "319": {
+  "file": "se_319.wav",
+  "name": "SE_SIR_KIBBLE_BOOMERANG_ATTACK",
+  "ms": 218
+ },
+ "320": {
+  "file": "se_320.wav",
+  "name": "SE_SPARKY_SHOCK_ATTACK",
+  "ms": 218
+ },
+ "321": {
+  "file": "se_321.wav",
+  "name": "SE_SWORD_KNIGHT_SLASH_ATTACK",
+  "ms": 218
+ },
+ "322": {
+  "file": "se_322.wav",
+  "name": "SE_08D5859C",
+  "ms": 218
+ },
+ "323": {
+  "file": "se_323.wav",
+  "name": "SE_TWISTER_FLYING",
+  "ms": 218
+ },
+ "324": {
+  "file": "se_324.wav",
+  "name": "SE_WHEELIE_COLLISION",
+  "ms": 318
+ },
+ "325": {
+  "file": "se_325.wav",
+  "name": "SE_BASIC_ENEMY_JUMP",
+  "ms": 218
+ },
+ "326": {
+  "file": "se_326.wav",
+  "name": "SE_BULLET_ATTACK",
+  "ms": 419
+ },
+ "328": {
+  "file": "se_328.wav",
+  "name": "SE_DROPPY_STEAL_ATTACK",
+  "ms": 318
+ },
+ "329": {
+  "file": "se_329.wav",
+  "name": "SE_PRANK_THROW_ITEM",
+  "ms": 218
+ },
+ "330": {
+  "file": "se_330.wav",
+  "name": "SE_PRANK_PAINT",
+  "ms": 419
+ },
+ "331": {
+  "file": "se_331.wav",
+  "name": "SE_GOLEM_SLAM_ATTACK",
+  "ms": 419
+ },
+ "332": {
+  "file": "se_332.wav",
+  "name": "SE_08D587A4",
+  "ms": 6446
+ },
+ "333": {
+  "file": "se_333.wav",
+  "name": "SE_GOLEM_WHEEL_ATTACK_COLLISION",
+  "ms": 218
+ },
+ "334": {
+  "file": "se_334.wav",
+  "name": "SE_GOLEM_PUNCH_ATTACK",
+  "ms": 318
+ },
+ "335": {
+  "file": "se_335.wav",
+  "name": "SE_FOLEY_DROP",
+  "ms": 519
+ },
+ "336": {
+  "file": "se_336.wav",
+  "name": "SE_BASIC_ENEMY_LASER_ATTACK",
+  "ms": 318
+ },
+ "337": {
+  "file": "se_337.wav",
+  "name": "SE_BANG_BANG_LAUNCH",
+  "ms": 419
+ },
+ "338": {
+  "file": "se_338.wav",
+  "name": "SE_BOXIN_PUNCH_ATTACK",
+  "ms": 318
+ },
+ "339": {
+  "file": "se_339.wav",
+  "name": "SE_08D5894C",
+  "ms": 318
+ },
+ "340": {
+  "file": "se_340.wav",
+  "name": "SE_COOKIN_THROW_PAN",
+  "ms": 318
+ },
+ "341": {
+  "file": "se_341.wav",
+  "name": "SE_HEAVY_KNIGHT_SLASH_ATTACK",
+  "ms": 218
+ },
+ "342": {
+  "file": "se_342.wav",
+  "name": "SE_GIANT_ROCKY_SLAM",
+  "ms": 419
+ },
+ "343": {
+  "file": "se_343.wav",
+  "name": "SE_METAL_GUARDIAN_TRI_LASER",
+  "ms": 318
+ },
+ "344": {
+  "file": "se_344.wav",
+  "name": "SE_08D58A2C",
+  "ms": 318
+ },
+ "345": {
+  "file": "se_345.wav",
+  "name": "SE_FROSTY_SWALLOW_KIRBY",
+  "ms": 318
+ },
+ "346": {
+  "file": "se_346.wav",
+  "name": "SE_FROSTY_SPIT_KIRBY",
+  "ms": 519
+ },
+ "348": {
+  "file": "se_348.wav",
+  "name": "SE_LEAP_KISS_ATTACK",
+  "ms": 419
+ },
+ "349": {
+  "file": "se_349.wav",
+  "name": "SE_JACK_ATTACK",
+  "ms": 218
+ },
+ "350": {
+  "file": "se_350.wav",
+  "name": "SE_CUPIE_ARROW_ATTACK",
+  "ms": 519
+ },
+ "351": {
+  "file": "se_351.wav",
+  "name": "SE_08D58B28",
+  "ms": 419
+ },
+ "352": {
+  "file": "se_352.wav",
+  "name": "SE_08D58B44",
+  "ms": 419
+ },
+ "353": {
+  "file": "se_353.wav",
+  "name": "SE_08D58B68",
+  "ms": 1222
+ },
+ "354": {
+  "file": "se_354.wav",
+  "name": "SE_DMK_PRE_SLASH_ATTACK",
+  "ms": 619
+ },
+ "355": {
+  "file": "se_355.wav",
+  "name": "SE_MINIBOSS_RUN",
+  "ms": 419
+ },
+ "356": {
+  "file": "se_356.wav",
+  "name": "SE_BOSS_GROUND_POUND_ATTACK",
+  "ms": 519
+ },
+ "357": {
+  "file": "se_357.wav",
+  "name": "SE_BONKERS_JUMP",
+  "ms": 419
+ },
+ "358": {
+  "file": "se_358.wav",
+  "name": "SE_MINIBOSS_EXPLOSION",
+  "ms": 1524
+ },
+ "359": {
+  "file": "se_359.wav",
+  "name": "SE_SPAWN_OBJECT",
+  "ms": 318
+ },
+ "360": {
+  "file": "se_360.wav",
+  "name": "SE_BOSS_THROW_OBJECT",
+  "ms": 519
+ },
+ "361": {
+  "file": "se_361.wav",
+  "name": "SE_08D58D6C",
+  "ms": 519
+ },
+ "362": {
+  "file": "se_362.wav",
+  "name": "SE_08D58DD4",
+  "ms": 820
+ },
+ "363": {
+  "file": "se_363.wav",
+  "name": "SE_08D58F3C",
+  "ms": 619
+ },
+ "364": {
+  "file": "se_364.wav",
+  "name": "SE_BONKERS_HAMMER_ATTACK",
+  "ms": 419
+ },
+ "365": {
+  "file": "se_365.wav",
+  "name": "SE_MINIBOSS_GRAB",
+  "ms": 218
+ },
+ "366": {
+  "file": "se_366.wav",
+  "name": "SE_PHANPHAN_SPIN_KIRBY",
+  "ms": 318
+ },
+ "367": {
+  "file": "se_367.wav",
+  "name": "SE_PHAN_PHAN_THROW_KIRBY",
+  "ms": 352
+ },
+ "368": {
+  "file": "se_368.wav",
+  "name": "SE_08D59034",
+  "ms": 1323
+ },
+ "369": {
+  "file": "se_369.wav",
+  "name": "SE_BATAFIRE_FIREBALLS_AND_DIVE",
+  "ms": 720
+ },
+ "370": {
+  "file": "se_370.wav",
+  "name": "SE_BOX_BOXER_CHARGE",
+  "ms": 318
+ },
+ "371": {
+  "file": "se_371.wav",
+  "name": "SE_BOX_BOXER_WAVE_ATTACK",
+  "ms": 1122
+ },
+ "372": {
+  "file": "se_372.wav",
+  "name": "SE_BOXY_THROW_PRESENT",
+  "ms": 419
+ },
+ "373": {
+  "file": "se_373.wav",
+  "name": "SE_BOXY_OPEN_PRESENT",
+  "ms": 318
+ },
+ "374": {
+  "file": "se_374.wav",
+  "name": "SE_HAND_PUNCH",
+  "ms": 1021
+ },
+ "375": {
+  "file": "se_375.wav",
+  "name": "SE_HAND_FINGER_GUN",
+  "ms": 619
+ },
+ "376": {
+  "file": "se_376.wav",
+  "name": "SE_BOMBAR_MISSILE_TELEGRAPH",
+  "ms": 218
+ },
+ "377": {
+  "file": "se_377.wav",
+  "name": "SE_BOMBAR_MISSILE_ATTACK",
+  "ms": 820
+ },
+ "378": {
+  "file": "se_378.wav",
+  "name": "SE_BOMBAR_DIVE_ATTACK",
+  "ms": 1122
+ },
+ "379": {
+  "file": "se_379.wav",
+  "name": "SE_AUDIENCE_CHEER",
+  "ms": 3231
+ },
+ "380": {
+  "file": "se_380.wav",
+  "name": "SE_MINIBOSS_PRE_EXPLODE",
+  "ms": 921
+ },
+ "383": {
+  "file": "se_383.wav",
+  "name": "SE_KRACKO_LIGHTNING_ATTACK",
+  "ms": 419
+ },
+ "384": {
+  "file": "se_384.wav",
+  "name": "SE_KRACKO_SWEEP_ATTACK",
+  "ms": 720
+ },
+ "385": {
+  "file": "se_385.wav",
+  "name": "SE_KING_GOLEM_HAND_SLAM",
+  "ms": 619
+ },
+ "386": {
+  "file": "se_386.wav",
+  "name": "SE_KING_GOLEM_SPAWN_GOLEM",
+  "ms": 419
+ },
+ "387": {
+  "file": "se_387.wav",
+  "name": "SE_08D599A0",
+  "ms": 720
+ },
+ "389": {
+  "file": "se_389.wav",
+  "name": "SE_GOBBLER_DASH_ATTACK",
+  "ms": 1423
+ },
+ "390": {
+  "file": "se_390.wav",
+  "name": "SE_GOBBLER_EAT_KIRBY",
+  "ms": 720
+ },
+ "391": {
+  "file": "se_391.wav",
+  "name": "SE_WIZ_TAP_HAT",
+  "ms": 820
+ },
+ "392": {
+  "file": "se_392.wav",
+  "name": "SE_WIZ_JUMP",
+  "ms": 318
+ },
+ "394": {
+  "file": "se_394.wav",
+  "name": "SE_MOLEY_DIG",
+  "ms": 820
+ },
+ "395": {
+  "file": "se_395.wav",
+  "name": "SE_MOLEY_THROW_ATTACK",
+  "ms": 820
+ },
+ "396": {
+  "file": "se_396.wav",
+  "name": "SE_MEGA_TITAN_FLY",
+  "ms": 921
+ },
+ "397": {
+  "file": "se_397.wav",
+  "name": "SE_MEGA_TITAN_FIST_ATTACK",
+  "ms": 1021
+ },
+ "398": {
+  "file": "se_398.wav",
+  "name": "SE_MEGA_TITAN_FIST_COLLISION",
+  "ms": 820
+ },
+ "399": {
+  "file": "se_399.wav",
+  "name": "SE_MEGA_TITAN_ELECTRIC_WALL",
+  "ms": 820
+ },
+ "400": {
+  "file": "se_400.wav",
+  "name": "SE_08D59BEC",
+  "ms": 619
+ },
+ "401": {
+  "file": "se_401.wav",
+  "name": "SE_BOX_BOXER_PUNCH_ATTACK",
+  "ms": 820
+ },
+ "402": {
+  "file": "se_402.wav",
+  "name": "SE_BOX_BOXER_GRAB",
+  "ms": 218
+ },
+ "403": {
+  "file": "se_403.wav",
+  "name": "SE_BOX_BOXER_THROW",
+  "ms": 352
+ },
+ "404": {
+  "file": "se_404.wav",
+  "name": "SE_BOSS_CLAP",
+  "ms": 820
+ },
+ "405": {
+  "file": "se_405.wav",
+  "name": "SE_BOX_BOXER_JUMP",
+  "ms": 619
+ },
+ "406": {
+  "file": "se_406.wav",
+  "name": "SE_BOXY_DASH",
+  "ms": 1222
+ },
+ "407": {
+  "file": "se_407.wav",
+  "name": "SE_BOXY_COLLISION",
+  "ms": 419
+ },
+ "409": {
+  "file": "se_409.wav",
+  "name": "SE_HAND_POUND",
+  "ms": 820
+ },
+ "410": {
+  "file": "se_410.wav",
+  "name": "SE_HAND_GRAB",
+  "ms": 218
+ },
+ "411": {
+  "file": "se_411.wav",
+  "name": "SE_BOMBAR_DROP_BOMB",
+  "ms": 519
+ },
+ "412": {
+  "file": "se_412.wav",
+  "name": "SE_GOBBLER_SPAWN_FISH",
+  "ms": 318
+ },
+ "413": {
+  "file": "se_413.wav",
+  "name": "SE_WIZ_SPAWN_ITEM",
+  "ms": 820
+ },
+ "414": {
+  "file": "se_414.wav",
+  "name": "SE_WIZ_DASH",
+  "ms": 1222
+ },
+ "415": {
+  "file": "se_415.wav",
+  "name": "SE_BATAFIRE_FLYING",
+  "ms": 519
+ },
+ "416": {
+  "file": "se_416.wav",
+  "name": "SE_08D59F44",
+  "ms": 1021
+ },
+ "417": {
+  "file": "se_417.wav",
+  "name": "SE_WIZ_SPAWN",
+  "ms": 921
+ },
+ "418": {
+  "file": "se_418.wav",
+  "name": "SE_WIZ_HAT_JIGGLE",
+  "ms": 318
+ },
+ "419": {
+  "file": "se_419.wav",
+  "name": "SE_WIZ_INITIAL_JUMP",
+  "ms": 1323
+ },
+ "420": {
+  "file": "se_420.wav",
+  "name": "SE_DMK_SWORD_SLASH_ATTACK",
+  "ms": 318
+ },
+ "421": {
+  "file": "se_421.wav",
+  "name": "SE_08D59FE4",
+  "ms": 218
+ },
+ "422": {
+  "file": "se_422.wav",
+  "name": "SE_DMK_PARRY",
+  "ms": 218
+ },
+ "423": {
+  "file": "se_423.wav",
+  "name": "SE_DARK_MIND_TELE_1",
+  "ms": 318
+ },
+ "424": {
+  "file": "se_424.wav",
+  "name": "SE_DARK_MIND_TELE_2",
+  "ms": 318
+ },
+ "425": {
+  "file": "se_425.wav",
+  "name": "SE_DARK_MIND_FORM_1_ATTACK",
+  "ms": 318
+ },
+ "426": {
+  "file": "se_426.wav",
+  "name": "SE_DARK_MIND_SHOOT_STAR",
+  "ms": 519
+ },
+ "427": {
+  "file": "se_427.wav",
+  "name": "SE_08D5A188",
+  "ms": 519
+ },
+ "428": {
+  "file": "se_428.wav",
+  "name": "SE_DARK_MIND_SHATTER",
+  "ms": 1624
+ },
+ "429": {
+  "file": "se_429.wav",
+  "name": "SE_DARK_MIND_MIRROR_SPIN_END",
+  "ms": 921
+ },
+ "430": {
+  "file": "se_430.wav",
+  "name": "SE_DARK_MIND_SCREEN_BOMB",
+  "ms": 1925
+ },
+ "431": {
+  "file": "se_431.wav",
+  "name": "SE_DARK_MIND_FORM_2_FIGHT_START",
+  "ms": 921
+ },
+ "432": {
+  "file": "se_432.wav",
+  "name": "SE_DARK_MIND_MIRROR_HURT",
+  "ms": 519
+ },
+ "433": {
+  "file": "se_433.wav",
+  "name": "SE_DARK_MIND_FORM_2_AMBIENT_2",
+  "ms": 1624
+ },
+ "434": {
+  "file": "se_434.wav",
+  "name": "SE_DARK_MIND_SCREEN_FLIP",
+  "ms": 921
+ },
+ "435": {
+  "file": "se_435.wav",
+  "name": "SE_DARK_MIND_LASER_BEAM",
+  "ms": 3533
+ },
+ "436": {
+  "file": "se_436.wav",
+  "name": "SE_DARK_MIND_LASER_SHOT",
+  "ms": 921
+ },
+ "437": {
+  "file": "se_437.wav",
+  "name": "SE_DARK_MIND_LASER_REBOUND",
+  "ms": 921
+ },
+ "438": {
+  "file": "se_438.wav",
+  "name": "SE_DARK_MIND_MIRROR_SWEEP",
+  "ms": 1323
+ },
+ "439": {
+  "file": "se_439.wav",
+  "name": "SE_DARK_MIND_MIRROR_CUTTER",
+  "ms": 519
+ },
+ "450": {
+  "file": "se_450.wav",
+  "name": "SE_DMK_CHARGE",
+  "ms": 218
+ },
+ "451": {
+  "file": "se_451.wav",
+  "name": "SE_DMK_TORNADO",
+  "ms": 619
+ },
+ "452": {
+  "file": "se_452.wav",
+  "name": "SE_DMK_WAVE_ATTACK",
+  "ms": 1189
+ },
+ "453": {
+  "file": "se_453.wav",
+  "name": "SE_DMK_MIDAIR_JUMP",
+  "ms": 318
+ },
+ "455": {
+  "file": "se_455.wav",
+  "name": "SE_08D5ACA0",
+  "ms": 2126
+ },
+ "500": {
+  "file": "se_500.wav",
+  "name": "SE_ITEM_COLLECT",
+  "ms": 218
+ },
+ "501": {
+  "file": "se_501.wav",
+  "name": "SE_BONUS_1UP",
+  "ms": 837
+ },
+ "502": {
+  "file": "se_502.wav",
+  "name": "SE_08D5AD9C",
+  "ms": 100
+ },
+ "503": {
+  "file": "se_503.wav",
+  "name": "SE_KIRBY_DEAD",
+  "ms": 2177
+ },
+ "504": {
+  "file": "se_504.wav",
+  "name": "SE_PAUSE_MENU_OPEN",
+  "ms": 167
+ },
+ "505": {
+  "file": "se_505.wav",
+  "name": "SE_08D5AE9C",
+  "ms": 50
+ },
+ "506": {
+  "file": "se_506.wav",
+  "name": "SE_PAUSE_MENU_ACTIVATE",
+  "ms": 117
+ },
+ "507": {
+  "file": "se_507.wav",
+  "name": "SE_PHONE_RING",
+  "ms": 4537,
+  "loop": true
+ },
+ "508": {
+  "file": "se_508.wav",
+  "name": "SE_08D5AF5C",
+  "ms": 4839,
+  "loop": true
+ },
+ "509": {
+  "file": "se_509.wav",
+  "name": "SE_08D5B2A8",
+  "ms": 4772
+ },
+ "510": {
+  "file": "se_510.wav",
+  "name": "SE_BLOCK_BREAK",
+  "ms": 703
+ },
+ "511": {
+  "file": "se_511.wav",
+  "name": "SE_08D5B4FC",
+  "ms": 2997
+ },
+ "512": {
+  "file": "se_512.wav",
+  "name": "SE_08D5B84C",
+  "ms": 5508
+ },
+ "513": {
+  "file": "se_513.wav",
+  "name": "SE_DARK_MIND_WARPSTAR_ENTER",
+  "ms": 1155
+ },
+ "514": {
+  "file": "se_514.wav",
+  "name": "SE_CANNON_FUSE_LIT",
+  "ms": 67
+ },
+ "515": {
+  "file": "se_515.wav",
+  "name": "SE_CANNON_KIRBY_LAUNCH",
+  "ms": 419
+ },
+ "516": {
+  "file": "se_516.wav",
+  "name": "SE_08D5B9E8",
+  "ms": 368
+ },
+ "517": {
+  "file": "se_517.wav",
+  "name": "SE_SWITCH_ACTIVATE",
+  "ms": 318
+ },
+ "518": {
+  "file": "se_518.wav",
+  "name": "SE_08D5BE24",
+  "ms": 6664
+ },
+ "519": {
+  "file": "se_519.wav",
+  "name": "SE_08D5C258",
+  "ms": 6479
+ },
+ "520": {
+  "file": "se_520.wav",
+  "name": "SE_08D5C490",
+  "ms": 1959
+ },
+ "521": {
+  "file": "se_521.wav",
+  "name": "SE_KIRBY_MIRROR_STANDARD",
+  "ms": 820
+ },
+ "522": {
+  "file": "se_522.wav",
+  "name": "SE_KIRBY_MIRROR_TO_HUB",
+  "ms": 720
+ },
+ "523": {
+  "file": "se_523.wav",
+  "name": "SE_08D5DADC",
+  "ms": 19991
+ },
+ "524": {
+  "file": "se_524.wav",
+  "name": "SE_8D_CANNON_LAUNCH",
+  "ms": 368
+ },
+ "525": {
+  "file": "se_525.wav",
+  "name": "SE_CHEST_COLLECT_ITEM",
+  "ms": 201
+ },
+ "526": {
+  "file": "se_526.wav",
+  "name": "SE_08D5DE20",
+  "ms": 2126
+ },
+ "527": {
+  "file": "se_527.wav",
+  "name": "SE_WARPSTAR_ACTIVATE_DESTROY",
+  "ms": 402
+ },
+ "528": {
+  "file": "se_528.wav",
+  "name": "SE_08D5DE8C",
+  "ms": 318
+ },
+ "530": {
+  "file": "se_530.wav",
+  "name": "SE_SHARD_OBTAINED",
+  "ms": 1624
+ },
+ "531": {
+  "file": "se_531.wav",
+  "name": "SE_MIRROR_COMPLETE",
+  "ms": 1624
+ },
+ "532": {
+  "file": "se_532.wav",
+  "name": "SE_08D5DEE4",
+  "ms": 820
+ },
+ "533": {
+  "file": "se_533.wav",
+  "name": "SE_VERT_SLIDING_DOOR_OPEN_CLOSE",
+  "ms": 619
+ },
+ "534": {
+  "file": "se_534.wav",
+  "name": "SE_DMK_CUTSCENE_MK_SLASH",
+  "ms": 1356
+ },
+ "535": {
+  "file": "se_535.wav",
+  "name": "SE_DMK_CUTSCENE_ARRIVES",
+  "ms": 1624
+ },
+ "536": {
+  "file": "se_536.wav",
+  "name": "SE_DMK_CUTSCENE_REVEALED",
+  "ms": 1624
+ },
+ "537": {
+  "file": "se_537.wav",
+  "name": "SE_DMK_SHATTER",
+  "ms": 1222
+ },
+ "538": {
+  "file": "se_538.wav",
+  "name": "SE_BLACK_HOLE",
+  "ms": 4839
+ },
+ "539": {
+  "file": "se_539.wav",
+  "name": "SE_DARK_MIND_FORM_2_AMBIENT_1",
+  "ms": 519
+ },
+ "541": {
+  "file": "se_541.wav",
+  "name": "SE_MAIN_MENU_CURSOR",
+  "ms": 50
+ },
+ "542": {
+  "file": "se_542.wav",
+  "name": "SE_MAIN_MENU_SELECT",
+  "ms": 117
+ },
+ "543": {
+  "file": "se_543.wav",
+  "name": "SE_MAIN_MENU_BACK",
+  "ms": 84
+ },
+ "544": {
+  "file": "se_544.wav",
+  "name": "SE_MAIN_MENU_DELETE_SAVE",
+  "ms": 887
+ },
+ "545": {
+  "file": "se_545.wav",
+  "name": "SE_MAIN_MENU_AMBIENT_1",
+  "ms": 1825
+ },
+ "546": {
+  "file": "se_546.wav",
+  "name": "SE_MAIN_MENU_AMBIENT_2",
+  "ms": 1323
+ },
+ "547": {
+  "file": "se_547.wav",
+  "name": "SE_APPLY_SPRAY_PAINT",
+  "ms": 820
+ },
+ "548": {
+  "file": "se_548.wav",
+  "name": "SE_PAUSE_WORLD_MAP_HUB_CONNECT",
+  "ms": 117
+ },
+ "549": {
+  "file": "se_549.wav",
+  "name": "SE_PAUSE_WORLD_MAP_HUB_MIRROR",
+  "ms": 770
+ },
+ "550": {
+  "file": "se_550.wav",
+  "name": "SE_SHADOW_KIRBY_SPAWN",
+  "ms": 854
+ },
+ "551": {
+  "file": "se_551.wav",
+  "name": "SE_CHEST_OPEN",
+  "ms": 1791
+ },
+ "552": {
+  "file": "se_552.wav",
+  "name": "SE_SUBGAMES_MOVE_CURSOR",
+  "ms": 50
+ },
+ "553": {
+  "file": "se_553.wav",
+  "name": "SE_SUBGAMES_SELECT",
+  "ms": 117
+ },
+ "554": {
+  "file": "se_554.wav",
+  "name": "SE_SUBGAME_CRACKITY_HACK_HIT",
+  "ms": 1624
+ },
+ "556": {
+  "file": "se_556.wav",
+  "name": "SE_SUBGAME_AUDIENCE_CHEER",
+  "ms": 3432
+ },
+ "557": {
+  "file": "se_557.wav",
+  "name": "SE_SUBGAME_WAVE_RIDE_JUMP",
+  "ms": 519
+ },
+ "558": {
+  "file": "se_558.wav",
+  "name": "SE_SUBGAME_WAVE_RIDE_LAND",
+  "ms": 318
+ },
+ "560": {
+  "file": "se_560.wav",
+  "name": "SE_SUBGAME_CRACKITY_HACK_DIG_1",
+  "ms": 318
+ },
+ "561": {
+  "file": "se_561.wav",
+  "name": "SE_SUBGAME_CRACKITY_HACK_DIG_2",
+  "ms": 318
+ },
+ "562": {
+  "file": "se_562.wav",
+  "name": "SE_SUBGAME_WAVE_RIDE_SPEEDUP",
+  "ms": 921
+ },
+ "565": {
+  "file": "se_565.wav",
+  "name": "SE_08D5E854",
+  "ms": 854
+ },
+ "566": {
+  "file": "se_566.wav",
+  "name": "SE_08D5EA08",
+  "ms": 1624
+ },
+ "567": {
+  "file": "se_567.wav",
+  "name": "SE_08D5EA2C",
+  "ms": 1624
+ },
+ "568": {
+  "file": "se_568.wav",
+  "name": "SE_SUBGAME_SPEED_EATERS_REVEAL",
+  "ms": 1624
+ },
+ "569": {
+  "file": "se_569.wav",
+  "name": "SE_SUBGAME_SPEED_EATERS_INHALE",
+  "ms": 1925
+ },
+ "570": {
+  "file": "se_570.wav",
+  "name": "SE_SUBGAME_SPEED_EATERS_SWALLOW",
+  "ms": 1624
+ },
+ "571": {
+  "file": "se_571.wav",
+  "name": "SE_SUBGAME_SPEED_EATERS_POINTS",
+  "ms": 100
+ },
+ "572": {
+  "file": "se_572.wav",
+  "name": "SE_SUBGAME_SPEED_EATERS_BOMBS",
+  "ms": 1624
+ },
+ "573": {
+  "file": "se_573.wav",
+  "name": "SE_INTRO_CUTSCENE_AMBIENT_1",
+  "ms": 4839
+ },
+ "574": {
+  "file": "se_574.wav",
+  "name": "SE_INTRO_CUTSCENE_AMBIENT_2",
+  "ms": 4839
+ },
+ "575": {
+  "file": "se_575.wav",
+  "name": "SE_INTRO_CUTSCENE_AMBIENT_3",
+  "ms": 5374
+ },
+ "576": {
+  "file": "se_576.wav",
+  "name": "SE_INTRO_CUTSCENE_MK_FLY_IN",
+  "ms": 2696
+ },
+ "577": {
+  "file": "se_577.wav",
+  "name": "SE_INTRO_CUTSCENE_DMK_LANDING",
+  "ms": 1356
+ },
+ "578": {
+  "file": "se_578.wav",
+  "name": "SE_INTRO_CUTSCENE_DMK_SLASH",
+  "ms": 1356
+ },
+ "579": {
+  "file": "se_579.wav",
+  "name": "SE_INTRO_CUTSCENE_DMK_JUMP",
+  "ms": 1356
+ },
+ "580": {
+  "file": "se_580.wav",
+  "name": "SE_INTRO_CUTSCENE_AMBIENT_4",
+  "ms": 6446
+ },
+ "581": {
+  "file": "se_581.wav",
+  "name": "SE_INTRO_CUTSCENE_WARP_STAR_ENTER",
+  "ms": 3231
+ },
+ "582": {
+  "file": "se_582.wav",
+  "name": "SE_INTRO_CUTSCENE_WARP_STAR_EXIT",
+  "ms": 3231
+ },
+ "583": {
+  "file": "se_583.wav",
+  "name": "SE_INTRO_CUTSCENE_KIRBY_RUN",
+  "ms": 1624
+ },
+ "584": {
+  "file": "se_584.wav",
+  "name": "SE_INTRO_CUTSCENE_KIRBY_SPIN",
+  "ms": 1624
+ },
+ "585": {
+  "file": "se_585.wav",
+  "name": "SE_POST_TUTO_MK_HIT",
+  "ms": 1624
+ },
+ "586": {
+  "file": "se_586.wav",
+  "name": "SE_POST_TUTO_SMOKE",
+  "ms": 1624
+ },
+ "587": {
+  "file": "se_587.wav",
+  "name": "SE_POST_TUTO_SLASH_MIRROR",
+  "ms": 1356
+ },
+ "588": {
+  "file": "se_588.wav",
+  "name": "SE_POST_TUTO_META_KNIGHT_GROUNDED",
+  "ms": 268
+ },
+ "589": {
+  "file": "se_589.wav",
+  "name": "SE_POST_TUTO_MIRROR_SHATTER",
+  "ms": 3231
+ },
+ "590": {
+  "file": "se_590.wav",
+  "name": "SE_POST_TUTO_DMK_EXIT",
+  "ms": 1624
+ },
+ "591": {
+  "file": "se_591.wav",
+  "name": "SE_POST_TUTO_SHADOW_KIRBY_BOUNCE",
+  "ms": 117
+ },
+ "592": {
+  "file": "se_592.wav",
+  "name": "SE_POST_TUTO_SHADOW_KIRBY_WALK",
+  "ms": 1624
+ },
+ "593": {
+  "file": "se_593.wav",
+  "name": "SE_POST_TUTO_SHADOW_KIRBY_SPAWN",
+  "ms": 988
+ },
+ "594": {
+  "file": "se_594.wav",
+  "name": "SE_DARK_MIND_FORM_2_DEAD_1",
+  "ms": 619
+ },
+ "595": {
+  "file": "se_595.wav",
+  "name": "SE_DARK_MIND_FORM_2_DEAD_2",
+  "ms": 1624
+ },
+ "596": {
+  "file": "se_596.wav",
+  "name": "SE_08D5F688",
+  "ms": 1624
+ },
+ "600": {
+  "file": "se_600.wav",
+  "name": "SE_INTRO_KIRBY_LOOK",
+  "ms": 1624
+ },
+ "601": {
+  "file": "se_601.wav",
+  "name": "SE_INTRO_KIRBY_EXPAND",
+  "ms": 1624
+ },
+ "602": {
+  "file": "se_602.wav",
+  "name": "SE_INTRO_KIRBY_DASH",
+  "ms": 1624
+ },
+ "603": {
+  "file": "se_603.wav",
+  "name": "SE_08D5F724",
+  "ms": 1624
+ },
+ "604": {
+  "file": "se_604.wav",
+  "name": "SE_INTRO_KIRBY_FLOAT",
+  "ms": 1624
+ },
+ "605": {
+  "file": "se_605.wav",
+  "name": "SE_INTRO_KIRBY_JUMP",
+  "ms": 1624
+ },
+ "606": {
+  "file": "se_606.wav",
+  "name": "SE_08D5F7CC",
+  "ms": 1624
+ },
+ "607": {
+  "file": "se_607.wav",
+  "name": "SE_INTRO_GIANT_ROCKY_SLAM",
+  "ms": 1624
+ },
+ "608": {
+  "file": "se_608.wav",
+  "name": "SE_08D5F8AC",
+  "ms": 6446
+ },
+ "609": {
+  "file": "se_609.wav",
+  "name": "SE_08D5F8F8",
+  "ms": 1624
+ },
+ "610": {
+  "file": "se_610.wav",
+  "name": "SE_08D5F938",
+  "ms": 1624
+ },
+ "611": {
+  "file": "se_611.wav",
+  "name": "SE_08D5F96C",
+  "ms": 1624
+ },
+ "612": {
+  "file": "se_612.wav",
+  "name": "SE_08D5F990",
+  "ms": 1624
+ },
+ "613": {
+  "file": "se_613.wav",
+  "name": "SE_INTRO_AMBIENT_1",
+  "ms": 1624
+ },
+ "614": {
+  "file": "se_614.wav",
+  "name": "SE_INTRO_AMBIENT_2",
+  "ms": 1624
+ },
+ "615": {
+  "file": "se_615.wav",
+  "name": "SE_08D5FA50",
+  "ms": 1624
+ },
+ "616": {
+  "file": "se_616.wav",
+  "name": "SE_08D5FA78",
+  "ms": 419
+ },
+ "617": {
+  "file": "se_617.wav",
+  "name": "SE_08D5FAA4",
+  "ms": 720
+ },
+ "618": {
+  "file": "se_618.wav",
+  "name": "SE_08D5FD28",
+  "ms": 4839
+ },
+ "619": {
+  "file": "se_619.wav",
+  "name": "SE_08D5FD8C",
+  "ms": 820
+ }
+}
